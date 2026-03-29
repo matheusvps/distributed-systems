@@ -25,6 +25,27 @@ Se quiser mudar categorias dos clientes ou limite de hot deal, edite esse arquiv
 ## Como rodar
 
 1. Garanta que o RabbitMQ esteja ativo em `amqp://localhost`.
+
+### Opcao com Docker (RabbitMQ)
+
+Se preferir, voce pode subir o RabbitMQ com Docker:
+
+```bash
+docker run -d --name rabbit-trab1 -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+```
+
+Painel web do RabbitMQ:
+- URL: `http://localhost:15672`
+- Usuario: `guest`
+- Senha: `guest`
+
+Para parar e remover o container:
+
+```bash
+docker stop rabbit-trab1
+docker rm rabbit-trab1
+```
+
 2. Na pasta do projeto, execute:
 
 ```bash
