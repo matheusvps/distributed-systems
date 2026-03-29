@@ -1,0 +1,22 @@
+{
+  "name": "trab1-sistemas-distribuidos",
+  "version": "1.0.0",
+  "description": "Sistema distribuido de promocoes com RabbitMQ e assinaturas digitais",
+  "main": "index.js",
+  "scripts": {
+    "generate:keys": "node scripts/generate-keys.js",
+    "start:gateway": "node src/gateway/index.js",
+    "start:promocao": "node src/promocao/index.js",
+    "start:ranking": "node src/ranking/index.js",
+    "start:notificacao": "node src/notificacao/index.js",
+    "start:cliente": "node src/cliente/index.js",
+    "start:cliente:a": "node src/cliente/index.js clienteA",
+    "start:cliente:b": "node src/cliente/index.js clienteB"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "amqplib": "^0.10.9"
+  }
+}
