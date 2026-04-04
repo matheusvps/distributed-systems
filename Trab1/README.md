@@ -19,6 +19,7 @@ Toda a configuracao fica no arquivo `config.js`:
 - `rabbitmqUrl`
 - `hotDealThreshold`
 - perfis dos clientes (`clientProfiles`)
+- categorias disponiveis (`categories`)
 
 Se quiser mudar categorias dos clientes ou limite de hot deal, edite esse arquivo.
 
@@ -31,19 +32,32 @@ Se quiser mudar categorias dos clientes ou limite de hot deal, edite esse arquiv
 Se preferir, voce pode subir o RabbitMQ com Docker:
 
 ```bash
-docker run -d --name rabbit-trab1 -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+[ ! "$(docker ps -a -q -f name=rabbit-trab1)" ] && docker run -d --name rabbit-trab1 -p 5672:5672 -p 15672:15672 rabbitmq:3-management || docker start rabbit-trab1
 ```
 
-Painel web do RabbitMQ:
-- URL: `http://localhost:15672`
-- Usuario: `guest`
+### 2. Usando DevContainers (Recomendado)
+
+Este projeto inclui suporte a **VS Code DevContainers**. Se você tiver o Docker e a extensão "Dev Containers" instalada:
+1. Abra o projeto no VS Code.
+2. Clique em **"Reopen in Container"** quando solicitado.
+3. O RabbitMQ será iniciado automaticamente e as dependências serão instaladas.
+
+**Painel Administrativo (Web UI):**
+- URL: [http://localhost:15672](http://localhost:15672)
+- Usuário: `guest`
 - Senha: `guest`
 
-Para parar e remover o container:
+Para parar o container:
 
 ```bash
 docker stop rabbit-trab1
-docker rm rabbit-trab1
+```
+
+Para deletar o container e os dados:
+
+```bash
+docker rm -f $(docker ps -a -q --filter ancestor=rabbitmq:3-management) 2>/dev/null || true
+docker rmi rabbitmq:3-management
 ```
 
 2. Na pasta do projeto, execute:

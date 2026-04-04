@@ -6,15 +6,20 @@ const { signatureBase } = require("./events");
 const keyCache = new Map();
 
 function readKey(fileName) {
-  const keyPath = path.resolve(__dirname, "../../keys", fileName);
-  const cacheKey = keyPath;
+  const currentService = process.env.SERVICE_NAME || "notificacao";
 
-  if (keyCache.has(cacheKey)) {
-    return keyCache.get(cacheKey);
+  const keyPath = path.resolve(process.cwd(), "src", currentService, "keys", fileName);
+
+  if (keyCache.has(keyPath)) {
+    return keyCache.get(keyPath);
+  }
+
+  if (!fs.existsSync(keyPath)) {
+    throw new Error(`Chave nao encontrada em: ${keyPath}.`);
   }
 
   const key = fs.readFileSync(keyPath, "utf8");
-  keyCache.set(cacheKey, key);
+  keyCache.set(keyPath, key);
   return key;
 }
 

@@ -8,8 +8,10 @@ const {
   ROUTING_KEYS,
   QUEUES
 } = require("../shared/constants");
+const { isVoteValid } = require("../shared/validation");
 
 const SERVICE_NAME = "ranking";
+process.env.SERVICE_NAME = SERVICE_NAME;
 const logger = createLogger("MS Ranking");
 const HOT_DEAL_THRESHOLD = Number(config.hotDealThreshold || 5);
 const rankingState = new Map();
@@ -35,7 +37,7 @@ async function start() {
 
       const { promotionId, vote, promotion } = event.payload || {};
 
-      if (!promotionId || ![1, -1].includes(vote)) {
+      if (!isVoteValid({ promotionId, vote })) {
         logger.warn("Evento de voto invalido descartado.");
         return;
       }

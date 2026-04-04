@@ -1,2 +1,5 @@
 node_modules/
-keys/*.pem
+*.pem
+.vc*
+.VC*
+.vscode/

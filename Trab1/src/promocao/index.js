@@ -9,20 +9,11 @@ const {
 } = require("../shared/constants");
 
 const SERVICE_NAME = "promocao";
+process.env.SERVICE_NAME = SERVICE_NAME;
 const logger = createLogger("MS Promocao");
 const promotions = new Map();
 
-function isPromotionValid(promo) {
-  return (
-    promo &&
-    typeof promo.id === "string" &&
-    typeof promo.title === "string" &&
-    typeof promo.category === "string" &&
-    typeof promo.store === "string" &&
-    Number.isFinite(promo.price) &&
-    promo.price > 0
-  );
-}
+const { isPromotionValid } = require("../shared/validation");
 
 async function start() {
   const { channel } = await createRabbitChannel(logger);

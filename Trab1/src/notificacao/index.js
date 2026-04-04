@@ -10,6 +10,7 @@ const {
 } = require("../shared/constants");
 
 const SERVICE_NAME = "notificacao";
+process.env.SERVICE_NAME = SERVICE_NAME;
 const logger = createLogger("MS Notificacao");
 
 function categoryRoutingKey(category) {

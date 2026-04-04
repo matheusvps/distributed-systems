@@ -17,10 +17,17 @@ const QUEUES = {
   NOTIFICACAO: "fila.notificacao"
 };
 
+const LOG_LEVELS = Object.freeze({
+  INFO: "INFO",
+  WARN: "WARN",
+  ERROR: "ERROR"
+});
+
 module.exports = {
   EVENTS_EXCHANGE,
   NOTIFICATIONS_EXCHANGE,
   EXCHANGE_TYPE,
   ROUTING_KEYS,
-  QUEUES
+  QUEUES,
+  LOG_LEVELS
 };
