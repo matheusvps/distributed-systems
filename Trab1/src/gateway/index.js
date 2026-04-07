@@ -10,7 +10,6 @@ const {
   QUEUES,
   LOG_LEVELS
 } = require("../shared/constants");
-const { isPromotionValid, isVoteValid } = require("../shared/validation");
 const config = require("../../config");
 
 const SERVICE_NAME = "gateway";
