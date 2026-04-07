@@ -35,12 +35,9 @@ Se preferir, voce pode subir o RabbitMQ com Docker:
 [ ! "$(docker ps -a -q -f name=rabbit-trab1)" ] && docker run -d --name rabbit-trab1 -p 5672:5672 -p 15672:15672 rabbitmq:3-management || docker start rabbit-trab1
 ```
 
-### 2. Usando DevContainers (Recomendado)
-
-Este projeto inclui suporte a **VS Code DevContainers**. Se você tiver o Docker e a extensão "Dev Containers" instalada:
-1. Abra o projeto no VS Code.
-2. Clique em **"Reopen in Container"** quando solicitado.
-3. O RabbitMQ será iniciado automaticamente e as dependências serão instaladas.
+<!-- ```powershell
+if (-not ((docker ps -a -q -f name=rabbit-trab1 | Out-String).Trim())) { docker run -d --name rabbit-trab1 -p 5672:5672 -p 15672:15672 rabbitmq:3-management } else { docker start rabbit-trab1 }
+``` -->
 
 **Painel Administrativo (Web UI):**
 - URL: [http://localhost:15672](http://localhost:15672)
@@ -59,6 +56,10 @@ Para deletar o container e os dados:
 docker rm -f $(docker ps -a -q --filter ancestor=rabbitmq:3-management) 2>/dev/null || true
 docker rmi rabbitmq:3-management
 ```
+
+<!-- ```bash
+$ids = docker ps -a -q --filter ancestor=rabbitmq:3-management; if ($ids) { docker rm -f $ids }; docker rmi rabbitmq:3-management 2>$null
+```` -->
 
 2. Na pasta do projeto, execute:
 

@@ -131,10 +131,10 @@ async function start() {
         createdAt: new Date().toISOString()
       };
 
-      if (!isPromotionValid(payload)) {
-        safeLog(`Dados da promocao invalidos. Escolha uma categoria da grade acima. Preco deve ser > 0.`, LOG_LEVELS.WARN);
-        continue;
-      }
+      // if (!isPromotionValid(payload)) {
+      //   safeLog(`Dados da promocao invalidos. Escolha uma categoria da grade acima. Preco deve ser > 0.`, LOG_LEVELS.WARN);
+      //   continue;
+      // }
 
       const waitForValidation = new Promise((resolve) => {
         pendingPublicacao.set(payload.id, resolve);
