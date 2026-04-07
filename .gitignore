@@ -1,0 +1,5 @@
+node_modules/
+*.pem
+.vc*
+.VC*
+.vscode/

@@ -131,11 +131,6 @@ async function start() {
         createdAt: new Date().toISOString()
       };
 
-      // if (!isPromotionValid(payload)) {
-      //   safeLog(`Dados da promocao invalidos. Escolha uma categoria da grade acima. Preco deve ser > 0.`, LOG_LEVELS.WARN);
-      //   continue;
-      // }
-
       const waitForValidation = new Promise((resolve) => {
         pendingPublicacao.set(payload.id, resolve);
         setTimeout(() => {
@@ -143,7 +138,7 @@ async function start() {
             pendingPublicacao.delete(payload.id);
             resolve();
           }
-        }, 3000);
+        }, 2000);
       });
 
       await publishSignedEvent(channel, ROUTING_KEYS.PROMOCAO_RECEBIDA, payload);
@@ -182,11 +177,6 @@ async function start() {
         votedAt: new Date().toISOString(),
         promotion
       };
-
-      if (!isVoteValid(payload)) {
-        safeLog("Voto invalido. Use +1 ou -1.", LOG_LEVELS.WARN);
-        continue;
-      }
 
       await publishSignedEvent(channel, ROUTING_KEYS.PROMOCAO_VOTO, payload);
       safeLog(`Evento ${ROUTING_KEYS.PROMOCAO_VOTO} publicado para ${promotion.id.substring(0, 8)}...`, LOG_LEVELS.INFO);
