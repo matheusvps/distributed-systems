@@ -2,6 +2,10 @@
 
 Projeto da disciplina de Sistemas Distribuidos usando Node.js, RabbitMQ e eventos assinados digitalmente (RSA).
 
+Alunos:
+Matheus Vinicius Passos de Santana
+Lucas Yukio Fukuda Matsumoto
+
 ## Visao geral
 
 O sistema tem 4 microsservicos e clientes consumidores:
