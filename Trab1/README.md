@@ -3,8 +3,8 @@
 Projeto da disciplina de Sistemas Distribuidos usando Node.js, RabbitMQ e eventos assinados digitalmente (RSA).
 
 Alunos:
-Matheus Vinicius Passos de Santana
-Lucas Yukio Fukuda Matsumoto
+- Matheus Vinicius Passos de Santana
+- Lucas Yukio Fukuda Matsumoto
 
 ## Visao geral
 
