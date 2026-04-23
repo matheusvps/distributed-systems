@@ -1,0 +1,52 @@
+services:
+  nameserver:
+    build: .
+    container_name: raft-ns
+    network_mode: host
+    command: python -m Pyro5.nameserver -n localhost -p 9090
+
+  node1:
+    build: .
+    container_name: raft-node1
+    network_mode: host
+    depends_on:
+      - nameserver
+    command: python run_node.py --id 1
+
+  node2:
+    build: .
+    container_name: raft-node2
+    network_mode: host
+    depends_on:
+      - nameserver
+    command: python run_node.py --id 2
+
+  node3:
+    build: .
+    container_name: raft-node3
+    network_mode: host
+    depends_on:
+      - nameserver
+    command: python run_node.py --id 3
+
+  node4:
+    build: .
+    container_name: raft-node4
+    network_mode: host
+    depends_on:
+      - nameserver
+    command: python run_node.py --id 4
+
+  client:
+    build: .
+    container_name: raft-client
+    profiles: ["client"]
+    network_mode: host
+    depends_on:
+      - nameserver
+      - node1
+      - node2
+      - node3
+      - node4
+    entrypoint: ["python", "client.py"]
+
