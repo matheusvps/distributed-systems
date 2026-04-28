@@ -15,7 +15,7 @@ def kill_previous_process(pattern: str) -> None:
         pass
 
 def main() -> None:
-    kill_previous_process("Pyro5.nameserver")
+    # kill_previous_process("Pyro5.nameserver")
     print("Iniciando novo Name Server...", flush=True)
     subprocess.run(["python3", "-m", "Pyro5.nameserver", "-n", "localhost", "-p", "9090"])
 
