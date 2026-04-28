@@ -45,6 +45,7 @@ class RaftNode:
         self.heartbeat_interval = 1.0
         self.election_deadline = 0.0
         self.last_heartbeat_sent = 0.0
+        self.next_index: Dict[int, int] = {}
 
         self.running = False
         self.lock = threading.RLock()
@@ -152,6 +153,7 @@ class RaftNode:
                 self.state = "Leader"
                 self.leader_id = self.node_id
                 self.last_heartbeat_sent = 0.0
+                self.next_index = {peer_id: len(self.log) + 1 for peer_id in self.peers}
                 print(
                     f"[Node {self.node_id}] eleito LIDER no termo {self.current_term}",
                     flush=True,
@@ -187,10 +189,18 @@ class RaftNode:
                 return
             term = self.current_term
             leader_commit = self.commit_index
-            prev_log_index, prev_log_term = self._last_log_info()
             self.last_heartbeat_sent = time.time()
 
         for peer_id, peer_uri in self.peers.items():
+            with self.lock:
+                if peer_id not in self.next_index:
+                    self.next_index[peer_id] = len(self.log) + 1
+                prev_log_index = self.next_index[peer_id] - 1
+                prev_log_term = (
+                    self.log[prev_log_index - 1]["term"] if prev_log_index > 0 else 0
+                )
+                entries = self.log[prev_log_index:]
+
             try:
                 with Pyro5.api.Proxy(peer_uri) as proxy:
                     response = proxy.append_entries(
@@ -198,13 +208,19 @@ class RaftNode:
                         self.node_id,
                         prev_log_index,
                         prev_log_term,
-                        [],
+                        entries,
                         leader_commit,
                     )
                 if response.get("term", 0) > term:
                     with self.lock:
                         self._become_follower(response["term"], None)
                     return
+                if response.get("success"):
+                    with self.lock:
+                        self.next_index[peer_id] = len(self.log) + 1
+                else:
+                    with self.lock:
+                        self.next_index[peer_id] = max(1, self.next_index[peer_id] - 1)
             except Exception as exc:
                 print(
                     f"[Node {self.node_id}] heartbeat para {peer_id} falhou: {exc}",
