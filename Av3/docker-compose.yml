@@ -3,7 +3,7 @@ services:
     build: .
     container_name: raft-ns
     network_mode: host
-    command: python -m Pyro5.nameserver -n localhost -p 9090
+    command: python run_nameserver.py
 
   node1:
     build: .

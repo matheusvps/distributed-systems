@@ -14,6 +14,9 @@ def _install_pyro_stub() -> None:
     def expose(obj):
         return obj
 
+    def oneway(obj):
+        return obj
+
     def behavior(**_kwargs):
         def decorator(obj):
             return obj
@@ -57,6 +60,7 @@ def _install_pyro_stub() -> None:
             return "PYRO:stub@localhost:5001"
 
     api_module.expose = expose
+    api_module.oneway = oneway
     api_module.behavior = behavior
     api_module.Daemon = DummyDaemon
     api_module.Proxy = DummyProxy

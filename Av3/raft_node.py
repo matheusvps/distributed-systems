@@ -24,7 +24,6 @@ def build_uri(node_id: int) -> str:
     return f"PYRO:{NODE_OBJECT_IDS[node_id]}@localhost:{NODE_PORTS[node_id]}"
 
 
-@Pyro5.api.expose
 @Pyro5.api.behavior(instance_mode="single")
 class RaftNode:
     def __init__(self, node_id: int):
@@ -121,12 +120,14 @@ class RaftNode:
         )
 
         votes = 1
+        alive_nodes = 1
         for peer_id, peer_uri in self.peers.items():
             try:
                 with Pyro5.api.Proxy(peer_uri) as proxy:
                     response = proxy.request_vote(
                         term_started, self.node_id, last_log_index, last_log_term
                     )
+                alive_nodes += 1
                 if response.get("term", 0) > term_started:
                     with self.lock:
                         self._become_follower(response["term"], None)
@@ -143,10 +144,11 @@ class RaftNode:
                     flush=True,
                 )
 
+        majority = (alive_nodes // 2) + 1
         with self.lock:
             if self.state != "Candidate" or self.current_term != term_started:
                 return
-            if votes >= 3:
+            if votes >= majority:
                 self.state = "Leader"
                 self.leader_id = self.node_id
                 self.last_heartbeat_sent = 0.0
@@ -226,10 +228,11 @@ class RaftNode:
             prev_log_term = self.log[prev_log_index - 1]["term"] if prev_log_index > 0 else 0
 
         acks = 1
+        alive_nodes = 1
         for peer_id, peer_uri in self.peers.items():
             try:
                 with Pyro5.api.Proxy(peer_uri) as proxy:
-                    response = proxy.append_entries(
+                    call = proxy.append_entries(
                         term,
                         self.node_id,
                         prev_log_index,
@@ -237,18 +240,20 @@ class RaftNode:
                         [entry],
                         leader_commit,
                     )
-                if response.get("term", 0) > term:
+                alive_nodes += 1
+                if call.get("term", 0) > term:
                     with self.lock:
-                        self._become_follower(response["term"], None)
+                        self._become_follower(call["term"], None)
                     return False
-                if response.get("success"):
+                if call.get("success"):
                     acks += 1
             except Exception as exc:
                 print(
                     f"[Node {self.node_id}] replicacao para {peer_id} falhou: {exc}",
                     flush=True,
                 )
-        return acks >= 3
+        majority = (alive_nodes // 2) + 1
+        return acks >= majority
 
     def _broadcast_commit(self, commit_index: int) -> None:
         with self.lock:
@@ -263,6 +268,7 @@ class RaftNode:
                     flush=True,
                 )
 
+    @Pyro5.api.expose
     def request_vote(
         self, term: int, candidate_id: int, last_log_index: int, last_log_term: int
     ) -> Dict:
@@ -287,6 +293,7 @@ class RaftNode:
 
             return {"term": self.current_term, "vote_granted": False}
 
+    @Pyro5.api.expose
     def append_entries(
         self,
         term: int,
@@ -334,15 +341,18 @@ class RaftNode:
 
             return {"term": self.current_term, "success": True}
 
-    def commit_up_to(self, term: int, leader_id: int, commit_index: int) -> Dict:
+    @Pyro5.api.expose
+    @Pyro5.api.oneway
+    def commit_up_to(self, term: int, leader_id: int, commit_index: int) -> None:
         with self.lock:
             if term < self.current_term:
-                return {"term": self.current_term, "success": False}
+                return
             self._become_follower(term, leader_id)
             self.commit_index = min(commit_index, len(self.log))
             self._apply_entries()
-            return {"term": self.current_term, "success": True}
+            return
 
+    @Pyro5.api.expose
     def client_command(self, command: str) -> Dict:
         with self.lock:
             if self.state != "Leader":
@@ -385,6 +395,7 @@ class RaftNode:
             "command": command,
         }
 
+    @Pyro5.api.expose
     def get_status(self) -> Dict:
         with self.lock:
             return {

@@ -1,5 +1,22 @@
+# Node
 node_modules/
+
+# Certificates
 *.pem
+
+# IDE
 .vc*
 .VC*
 .vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+.eggs/
+pip-wheel-metadata/
+.pytest_cache/
+*.pyc

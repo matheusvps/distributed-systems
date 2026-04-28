@@ -106,7 +106,7 @@ Opcionalmente, em 6 terminais:
 
 1. Name Server:
 ```bash
-python -m Pyro5.nameserver -n localhost -p 9090
+python run_nameserver.py
 ```
 2. Nos:
 ```bash
