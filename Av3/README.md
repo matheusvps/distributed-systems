@@ -25,7 +25,7 @@ Implementacao de consenso Raft para replicacao de log distribuido entre 4 nos, u
 
 - Timeout de eleicao aleatorio por no.
 - Ao expirar o timeout:
-  - no vira `Candidate`;
+  - no vira `Candidato`;
   - incrementa `term`;
   - solicita votos (`request_vote`) aos outros nos.
 - Lider eleito ao obter maioria (>= 3 de 4).
@@ -73,7 +73,7 @@ Em outro terminal, na pasta `Av3`:
 ### comando unico
 
 ```bash
-docker compose run --rm client --command "SET x 1"
+docker compose run --rm client --command "Teste 123"
 ```
 
 ### modo interativo
@@ -117,7 +117,7 @@ python run_node.py --id 4
 ```
 3. Cliente:
 ```bash
-python client.py --command "SET x 1"
+python client.py --command "TEST_COMMAND"
 ```
 
 ## Testes

@@ -4,8 +4,6 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 import Pyro5.api
-import Pyro5.errors
-
 
 NODE_IDS = [1, 2, 3, 4]
 NODE_PORTS = {1: 5001, 2: 5002, 3: 5003, 4: 5004}
@@ -46,6 +44,7 @@ class RaftNode:
         self.election_deadline = 0.0
         self.last_heartbeat_sent = 0.0
         self.next_index: Dict[int, int] = {}
+        self.peer_alive: Dict[int, bool] = dict.fromkeys(self.peers, True)
 
         self.running = False
         self.lock = threading.RLock()
@@ -61,7 +60,7 @@ class RaftNode:
         ticker.start()
 
         print(
-            f"[Node {self.node_id}] iniciado em {self.uri} | estado inicial: {self.state}",
+            f"node{self.node_id}: iniciado em {self.uri} | estado: {self.state}",
             flush=True,
         )
         self.daemon.requestLoop(loopCondition=lambda: self.running)
@@ -84,7 +83,7 @@ class RaftNode:
                 now = time.time()
                 deadline = self.election_deadline
 
-            if state == "Leader":
+            if state == "Lider":
                 if now - self.last_heartbeat_sent >= self.heartbeat_interval:
                     self._send_heartbeats()
             else:
@@ -107,7 +106,7 @@ class RaftNode:
 
     def _start_election(self) -> None:
         with self.lock:
-            self.state = "Candidate"
+            self.state = "Candidato"
             self.current_term += 1
             term_started = self.current_term
             self.voted_for = self.node_id
@@ -115,52 +114,54 @@ class RaftNode:
             self._reset_election_deadline()
             last_log_index, last_log_term = self._last_log_info()
 
-        print(
-            f"[Node {self.node_id}] iniciando eleicao no termo {term_started}",
-            flush=True,
-        )
+        print(f"node{self.node_id}: candidatou-se no termo {term_started}", flush=True)
 
+        votes, alive_nodes = self._collect_votes(term_started, last_log_index, last_log_term)
+        if votes < 0:
+            return
+
+        majority = (alive_nodes // 2) + 1
+        with self.lock:
+            if self.state != "Candidato" or self.current_term != term_started:
+                return
+            if votes >= majority:
+                self._become_leader()
+            else:
+                self._become_follower(self.current_term, None)
+
+    def _collect_votes(self, term: int, last_idx: int, last_term: int) -> Tuple[int, int]:
         votes = 1
         alive_nodes = 1
         for peer_id, peer_uri in self.peers.items():
             try:
+                print(f"node{self.node_id} -> node{peer_id}: PEDIU VOTO no termo {term}", flush=True)
                 with Pyro5.api.Proxy(peer_uri) as proxy:
-                    response = proxy.request_vote(
-                        term_started, self.node_id, last_log_index, last_log_term
-                    )
+                    resp = proxy.request_vote(term, self.node_id, last_idx, last_term)
                 alive_nodes += 1
-                if response.get("term", 0) > term_started:
-                    with self.lock:
-                        self._become_follower(response["term"], None)
-                    return
-                if response.get("vote_granted"):
-                    votes += 1
-                    print(
-                        f"[Node {self.node_id}] voto recebido de {peer_id} (total={votes})",
-                        flush=True,
-                    )
+                if resp and isinstance(resp, dict):
+                    if resp.get("term", 0) > term:
+                        self._become_follower(resp["term"], None)
+                        return -1, alive_nodes
+                    if resp.get("vote_granted"):
+                        votes += 1
             except Exception as exc:
-                print(
-                    f"[Node {self.node_id}] falha ao solicitar voto de {peer_id}: {exc}",
-                    flush=True,
-                )
+                if self.peer_alive.get(peer_id, True):
+                    print(f"node{self.node_id} -> node{peer_id}: falha ao solicitar voto: {exc}", flush=True)
+                    self.peer_alive[peer_id] = False
+        return votes, alive_nodes
 
-        majority = (alive_nodes // 2) + 1
-        with self.lock:
-            if self.state != "Candidate" or self.current_term != term_started:
-                return
-            if votes >= majority:
-                self.state = "Leader"
-                self.leader_id = self.node_id
-                self.last_heartbeat_sent = 0.0
-                self.next_index = {peer_id: len(self.log) + 1 for peer_id in self.peers}
-                print(
-                    f"[Node {self.node_id}] eleito LIDER no termo {self.current_term}",
-                    flush=True,
-                )
-                self._register_as_leader()
-            else:
-                self._become_follower(self.current_term, None)
+    def _become_leader(self) -> None:
+        if not self._register_as_leader():
+            print(f"node{self.node_id}: falha critica ao registrar no Name Server. Voltando a Follower.", flush=True)
+            self._become_follower(self.current_term, None)
+            return
+
+        self.state = "Lider"
+        self.leader_id = self.node_id
+        self.last_heartbeat_sent = 0.0
+        self.next_index = {p_id: len(self.log) + 1 for p_id in self.peers}
+        
+        print(f"node{self.node_id}: eleito LIDER no termo {self.current_term} (registrado no Name Server como '{LEADER_NS_NAME}')", flush=True)
 
     def _become_follower(self, new_term: int, leader_id: Optional[int]) -> None:
         self.state = "Follower"
@@ -169,118 +170,126 @@ class RaftNode:
         self.leader_id = leader_id
         self._reset_election_deadline()
 
-    def _register_as_leader(self) -> None:
+    def _register_as_leader(self) -> bool:
         try:
             with Pyro5.api.locate_ns(host=NAMESERVER_HOST, port=NAMESERVER_PORT) as ns:
                 ns.register(LEADER_NS_NAME, self.uri, safe=False)
-                print(
-                    f"[Node {self.node_id}] registrado no Name Server como '{LEADER_NS_NAME}'",
-                    flush=True,
-                )
+                return True
         except Exception as exc:
-            print(
-                f"[Node {self.node_id}] erro ao registrar lider no Name Server: {exc}",
-                flush=True,
-            )
+            print(f"node{self.node_id}: erro ao registrar lider no Name Server: {exc}", flush=True)
+            return False
 
     def _send_heartbeats(self) -> None:
         with self.lock:
-            if self.state != "Leader":
+            if self.state != "Lider":
                 return
             term = self.current_term
             leader_commit = self.commit_index
             self.last_heartbeat_sent = time.time()
 
         for peer_id, peer_uri in self.peers.items():
-            with self.lock:
-                if peer_id not in self.next_index:
-                    self.next_index[peer_id] = len(self.log) + 1
-                prev_log_index = self.next_index[peer_id] - 1
-                prev_log_term = (
-                    self.log[prev_log_index - 1]["term"] if prev_log_index > 0 else 0
-                )
-                entries = self.log[prev_log_index:]
+            self._send_append_entries_to_peer(peer_id, peer_uri, term, leader_commit)
 
-            try:
-                with Pyro5.api.Proxy(peer_uri) as proxy:
-                    response = proxy.append_entries(
-                        term,
-                        self.node_id,
-                        prev_log_index,
-                        prev_log_term,
-                        entries,
-                        leader_commit,
-                    )
-                if response.get("term", 0) > term:
-                    with self.lock:
-                        self._become_follower(response["term"], None)
-                    return
-                if response.get("success"):
-                    with self.lock:
-                        self.next_index[peer_id] = len(self.log) + 1
-                else:
-                    with self.lock:
-                        self.next_index[peer_id] = max(1, self.next_index[peer_id] - 1)
-            except Exception as exc:
-                print(
-                    f"[Node {self.node_id}] heartbeat para {peer_id} falhou: {exc}",
-                    flush=True,
-                )
+    def _send_append_entries_to_peer(self, peer_id: int, peer_uri: str, term: int, commit: int) -> None:
+        with self.lock:
+            next_idx = self.next_index.get(peer_id, 1)
+            prev_idx = next_idx - 1
+            prev_term = self.log[prev_idx - 1]["term"] if prev_idx > 0 else 0
+            entries = self.log[next_idx - 1 :]
 
-    def _apply_entries(self) -> None:
+        try:
+            if entries and self.peer_alive.get(peer_id, True):
+                print(f"node{self.node_id} -> node{peer_id}: APPEND_ENTRIES index={entries[0]['index']} command={entries[0]['command']} termo {term}", flush=True)
+                
+            with Pyro5.api.Proxy(peer_uri) as proxy:
+                resp = proxy.append_entries(term, self.node_id, prev_idx, prev_term, entries, commit)
+                self._handle_append_entries_resp(peer_id, resp, term)
+        except Exception as exc:
+            if self.peer_alive.get(peer_id, True):
+                print(f"node{self.node_id} -> node{peer_id}: conexao perdida: {exc}", flush=True)
+                self.peer_alive[peer_id] = False
+
+    def _handle_append_entries_resp(self, peer_id: int, resp: Optional[Dict], term: int) -> None:
+        self.peer_alive[peer_id] = True
+        if not resp or not isinstance(resp, dict):
+            return
+        if resp.get("term", 0) > term:
+            self._become_follower(resp["term"], None)
+            return
+        with self.lock:
+            if resp.get("success"):
+                self.next_index[peer_id] = len(self.log) + 1
+            else:
+                self.next_index[peer_id] = max(1, self.next_index[peer_id] - 1)
+
+    def _apply_entries(self, silent: bool = False) -> None:
         while self.last_applied < self.commit_index:
             entry = self.log[self.last_applied]
             self.last_applied += 1
-            print(
-                f"[Node {self.node_id}] APPLY term={entry['term']} index={entry['index']} command={entry['command']}",
-                flush=True,
-            )
+            if not silent:
+                print(
+                    f"node{self.node_id}: COMMITTED index={entry['index']} command={entry['command']}",
+                    flush=True,
+                )
 
     def _replicate_entry(self, entry: Dict) -> bool:
         with self.lock:
             term = self.current_term
             leader_commit = self.commit_index
-            prev_log_index = entry["index"] - 1
-            prev_log_term = self.log[prev_log_index - 1]["term"] if prev_log_index > 0 else 0
+            prev_idx = entry["index"] - 1
+            prev_term = self.log[prev_idx - 1]["term"] if prev_idx > 0 else 0
 
         acks = 1
         alive_nodes = 1
-        for peer_id, peer_uri in self.peers.items():
-            try:
-                with Pyro5.api.Proxy(peer_uri) as proxy:
-                    call = proxy.append_entries(
-                        term,
-                        self.node_id,
-                        prev_log_index,
-                        prev_log_term,
-                        [entry],
-                        leader_commit,
-                    )
+        for p_id, p_uri in self.peers.items():
+            if self._send_entry_to_peer(p_id, p_uri, term, entry, prev_idx, prev_term, leader_commit):
+                acks += 1
+            if self.peer_alive.get(p_id, True):
                 alive_nodes += 1
+
+        majority = (alive_nodes // 2) + 1
+        success = acks >= majority
+        if not success:
+            print(f"node{self.node_id}: falha ao replicar index={entry['index']} (acks={acks}, maioria={majority})", flush=True)
+        return success
+
+    def _send_entry_to_peer(self, peer_id: int, peer_uri: str, term: int, entry: Dict, prev_idx: int, prev_term: int, commit: int) -> bool:
+        if not self.peer_alive.get(peer_id, True):
+            print(f"node{self.node_id} -> node{peer_id}: APPEND_ENTRIES (falhou: offline)", flush=True)
+            return False
+        try:
+            print(f"node{self.node_id} -> node{peer_id}: APPEND_ENTRIES index={entry['index']} command={entry['command']}", flush=True)
+            with Pyro5.api.Proxy(peer_uri) as proxy:
+                call = proxy.append_entries(term, self.node_id, prev_idx, prev_term, [entry], commit)
+            if call and isinstance(call, dict):
                 if call.get("term", 0) > term:
-                    with self.lock:
-                        self._become_follower(call["term"], None)
+                    self._become_follower(call["term"], None)
                     return False
                 if call.get("success"):
-                    acks += 1
-            except Exception as exc:
-                print(
-                    f"[Node {self.node_id}] replicacao para {peer_id} falhou: {exc}",
-                    flush=True,
-                )
-        majority = (alive_nodes // 2) + 1
-        return acks >= majority
+                    print(f"node{peer_id} -> node{self.node_id}: OK index={entry['index']}", flush=True)
+                    with self.lock:
+                        self.next_index[peer_id] = entry["index"] + 1
+                    return True
+        except Exception as exc:
+            if self.peer_alive.get(peer_id, True):
+                print(f"node{self.node_id} -> node{peer_id}: replicacao falhou: {exc}", flush=True)
+                self.peer_alive[peer_id] = False
+        return False
 
     def _broadcast_commit(self, commit_index: int) -> None:
         with self.lock:
             term = self.current_term
         for peer_id, peer_uri in self.peers.items():
+            if not self.peer_alive.get(peer_id, True):
+                print(f"node{self.node_id} -> node{peer_id}: COMMIT (falhou: offline)", flush=True)
+                continue
             try:
+                print(f"node{self.node_id} -> node{peer_id}: COMMIT index={commit_index}", flush=True)
                 with Pyro5.api.Proxy(peer_uri) as proxy:
                     proxy.commit_up_to(term, self.node_id, commit_index)
             except Exception as exc:
                 print(
-                    f"[Node {self.node_id}] confirmacao de commit para {peer_id} falhou: {exc}",
+                    f"node{self.node_id} -> node{peer_id}: falha ao enviar commit: {exc}",
                     flush=True,
                 )
 
@@ -302,7 +311,7 @@ class RaftNode:
                 self.voted_for = candidate_id
                 self._reset_election_deadline()
                 print(
-                    f"[Node {self.node_id}] votou em {candidate_id} no termo {self.current_term}",
+                    f"node{self.node_id} -> node{candidate_id}: VOTO em node{candidate_id} no termo {self.current_term}",
                     flush=True,
                 )
                 return {"term": self.current_term, "vote_granted": True}
@@ -329,33 +338,43 @@ class RaftNode:
                 self.leader_id = leader_id
                 self._reset_election_deadline()
 
-            if prev_log_index > len(self.log):
+            if not self._check_prev_log(prev_log_index, prev_log_term):
                 return {"term": self.current_term, "success": False}
 
-            if prev_log_index > 0:
-                local_prev_term = self.log[prev_log_index - 1]["term"]
-                if local_prev_term != prev_log_term:
-                    self.log = self.log[: prev_log_index - 1]
-                    return {"term": self.current_term, "success": False}
-
-            for entry in entries:
-                idx = entry["index"]
-                if idx <= len(self.log):
-                    if self.log[idx - 1]["term"] != entry["term"]:
-                        self.log = self.log[: idx - 1]
-                        self.log.append(entry)
-                else:
-                    self.log.append(entry)
-                print(
-                    f"[Node {self.node_id}] RECV term={entry['term']} index={entry['index']} command={entry['command']}",
-                    flush=True,
-                )
+            self._sync_log(entries)
 
             if leader_commit > self.commit_index:
-                self.commit_index = min(leader_commit, len(self.log))
-                self._apply_entries()
+                new_commit = min(leader_commit, len(self.log))
+                if new_commit > self.commit_index:
+                    entry = self.log[new_commit - 1]
+                    print(f"node{leader_id} -> node{self.node_id}: COMMIT index={new_commit}", flush=True)
+                    self.commit_index = new_commit
+                    print(f"node{self.node_id} -> node{leader_id}: COMMITTED index={self.commit_index} command={entry['command']}", flush=True)
+                    self._apply_entries(silent=True)
 
             return {"term": self.current_term, "success": True}
+
+    def _sync_log(self, entries: List[Dict]) -> None:
+        for entry in entries:
+            idx = entry["index"]
+            if idx <= len(self.log):
+                if self.log[idx - 1]["term"] != entry["term"]:
+                    self.log = self.log[: idx - 1]
+                    self.log.append(entry)
+            else:
+                self.log.append(entry)
+
+    def _check_prev_log(self, prev_log_index: int, prev_log_term: int) -> bool:
+        if prev_log_index > len(self.log):
+            return False
+
+        if prev_log_index > 0:
+            local_prev_term = self.log[prev_log_index - 1]["term"]
+            if local_prev_term != prev_log_term:
+                self.log = self.log[: prev_log_index - 1]
+                return False
+            
+        return True
 
     @Pyro5.api.expose
     @Pyro5.api.oneway
@@ -364,14 +383,16 @@ class RaftNode:
             if term < self.current_term:
                 return
             self._become_follower(term, leader_id)
-            self.commit_index = min(commit_index, len(self.log))
-            self._apply_entries()
-            return
+            if commit_index > self.commit_index:
+                self.commit_index = min(commit_index, len(self.log))
+                entry = self.log[self.commit_index - 1]
+                print(f"node{self.node_id} -> node{leader_id}: COMMITTED index={self.commit_index} command={entry['command']}", flush=True)
+                self._apply_entries(silent=True)
 
     @Pyro5.api.expose
     def client_command(self, command: str) -> Dict:
         with self.lock:
-            if self.state != "Leader":
+            if self.state != "Lider":
                 leader_uri = build_uri(self.leader_id) if self.leader_id else None
                 return {
                     "success": False,
@@ -386,7 +407,7 @@ class RaftNode:
             }
             self.log.append(entry)
             print(
-                f"[Node {self.node_id}] CLIENT term={entry['term']} index={entry['index']} command={entry['command']}",
+                f"client -> node{self.node_id}: command={entry['command']}",
                 flush=True,
             )
 
@@ -422,4 +443,3 @@ class RaftNode:
                 "commit_index": self.commit_index,
                 "log_size": len(self.log),
             }
-

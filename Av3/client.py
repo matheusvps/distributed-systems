@@ -12,7 +12,7 @@ def find_leader_uri() -> str:
         return ns.lookup(LEADER_NS_NAME)
 
 
-def send_command(command: str) -> dict:
+def send_command(command: str):
     leader_uri = find_leader_uri()
     with Pyro5.api.Proxy(leader_uri) as leader:
         result = leader.client_command(command)
@@ -47,7 +47,7 @@ def main() -> None:
     parser.add_argument(
         "--command",
         type=str,
-        help="Comando único para envio. Se omitido, inicia modo interativo.",
+        help="Comando unico para envio. Se omitido, inicia modo interativo.",
     )
     args = parser.parse_args()
 
@@ -65,4 +65,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

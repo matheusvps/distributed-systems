@@ -2,6 +2,8 @@ import sys
 import types
 import unittest
 
+from raft_node import RaftNode
+
 
 def _install_pyro_stub() -> None:
     if "Pyro5" in sys.modules:
@@ -25,12 +27,13 @@ def _install_pyro_stub() -> None:
 
     class DummyDaemon:
         def __init__(self, *args, **kwargs):
+            # Apenas para preencher a interface
             pass
 
         def register(self, *args, **kwargs):
             return None
 
-        def requestLoop(self, *args, **kwargs):
+        def requestLoop(self, *args, **kwargs): # noqa # Funcao interna
             return None
 
         def shutdown(self):
@@ -59,15 +62,19 @@ def _install_pyro_stub() -> None:
         def lookup(self, *_args, **_kwargs):
             return "PYRO:stub@localhost:5001"
 
-    api_module.expose = expose
-    api_module.oneway = oneway
-    api_module.behavior = behavior
-    api_module.Daemon = DummyDaemon
-    api_module.Proxy = DummyProxy
-    api_module.locate_ns = lambda **_kwargs: DummyNs()
+    api_module.__dict__.update({
+        "expose": expose,
+        "oneway": oneway,
+        "behavior": behavior,
+        "Daemon": DummyDaemon,
+        "Proxy": DummyProxy,
+        "locate_ns": lambda **_kwargs: DummyNs(),
+    })
 
-    pyro_module.api = api_module
-    pyro_module.errors = errors_module
+    pyro_module.__dict__.update({
+        "api": api_module,
+        "errors": errors_module,
+    })
 
     sys.modules["Pyro5"] = pyro_module
     sys.modules["Pyro5.api"] = api_module
@@ -75,8 +82,6 @@ def _install_pyro_stub() -> None:
 
 
 _install_pyro_stub()
-
-from raft_node import RaftNode
 
 
 class RaftNodeTests(unittest.TestCase):
@@ -95,7 +100,7 @@ class RaftNodeTests(unittest.TestCase):
             leader_id=1,
             prev_log_index=0,
             prev_log_term=0,
-            entries=[{"term": 1, "index": 1, "command": "SET x 10"}],
+            entries=[{"term": 1, "index": 1, "command": "Teste 123"}],
             leader_commit=0,
         )
 
@@ -103,7 +108,7 @@ class RaftNodeTests(unittest.TestCase):
         self.assertEqual(len(node.log), 1)
         self.assertEqual(node.log[0]["term"], 1)
         self.assertEqual(node.log[0]["index"], 1)
-        self.assertEqual(node.log[0]["command"], "SET x 10")
+        self.assertEqual(node.log[0]["command"], "Teste 123")
 
     def test_client_command_redirects_when_not_leader(self):
         node = RaftNode(3)
@@ -115,4 +120,3 @@ class RaftNodeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
