@@ -1,6 +1,10 @@
-# AV3 - Raft com PyRO5
+# Avaliação 3 - Sistemas Distribuídos - Raft com PyRO5
 
 Implementação de consenso Raft para replicação de log distribuído entre 4 nós, usando `PyRO5`.
+
+Alunos:
+- Lucas Yukio Fukuda Matsumoto
+- Matheus Vinicius Passos de Santana
 
 ## Arquitetura
 
