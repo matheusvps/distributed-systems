@@ -87,15 +87,17 @@ _install_pyro_stub()
 class RaftNodeTests(unittest.TestCase):
     def test_follower_vote_when_candidate_log_is_up_to_date(self):
         node = RaftNode(1)
-        response = node.request_vote(term=1, candidate_id=2, last_log_index=0, last_log_term=0)
-        self.assertTrue(response["vote_granted"])
+        # Atualizado para camelCase e voteGranted
+        response = node.requestVote(term=1, candidate_id=2, last_log_index=0, last_log_term=0)
+        self.assertTrue(response["voteGranted"])
         self.assertEqual(node.voted_for, 2)
         self.assertEqual(node.current_term, 1)
 
     def test_append_entries_persists_log_fields(self):
         node = RaftNode(2)
         node.current_term = 1
-        response = node.append_entries(
+        # Atualizado para camelCase
+        response = node.appendEntries(
             term=1,
             leader_id=1,
             prev_log_index=0,
@@ -112,7 +114,7 @@ class RaftNodeTests(unittest.TestCase):
 
     def test_client_command_redirects_when_not_leader(self):
         node = RaftNode(3)
-        node.state = "Follower"
+        node.state = "Seguidor"
         response = node.client_command("SET y 20")
         self.assertFalse(response["success"])
         self.assertEqual(response["reason"], "not_leader")
