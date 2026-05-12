@@ -6,18 +6,15 @@ import Pyro5.api
 
 from raft_node import LEADER_NS_NAME, NAMESERVER_HOST, NAMESERVER_PORT
 
-
 def find_leader_uri() -> str:
     with Pyro5.api.locate_ns(host=NAMESERVER_HOST, port=NAMESERVER_PORT) as ns:
         return ns.lookup(LEADER_NS_NAME)
-
 
 def send_command(command: str):
     leader_uri = find_leader_uri()
     with Pyro5.api.Proxy(leader_uri) as leader:
         result = leader.client_command(command)
     return result
-
 
 def interactive_mode() -> None:
     print("Cliente Raft iniciado. Digite comandos (ou 'sair').", flush=True)
@@ -41,7 +38,6 @@ def interactive_mode() -> None:
 
         print(f"Resposta: {result}", flush=True)
 
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Cliente para cluster Raft via PyRO5.")
     parser.add_argument(
@@ -61,7 +57,6 @@ def main() -> None:
             )
             return
         interactive_mode()
-
 
 if __name__ == "__main__":
     main()

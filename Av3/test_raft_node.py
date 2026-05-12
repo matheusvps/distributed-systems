@@ -1,124 +1,145 @@
-import sys
-import types
 import unittest
+import threading
+import time
+from unittest.mock import patch, MagicMock
+import raft_node
+from raft_node import RaftNode, LEADER_NS_NAME, build_uri
 
-from raft_node import RaftNode
+class MockProxy:
+    def __init__(self, uri, nodes_dict, fail_nodes=None):
+        self.uri = uri
+        self.nodes_dict = nodes_dict
+        self.fail_nodes = fail_nodes or set()
+        self._pyroTimeout = 0
 
+    def __getattr__(self, name):
+        target_node = None
+        for node in self.nodes_dict.values():
+            if node.uri == self.uri:
+                target_node = node
+                break
+        
+        if not target_node or target_node.node_id in self.fail_nodes:
+            def failed_call(*args, **kwargs):
+                raise RuntimeError(f"Node {target_node.node_id if target_node else 'unknown'} is down")
+            return failed_call
 
-def _install_pyro_stub() -> None:
-    if "Pyro5" in sys.modules:
-        return
+        return getattr(target_node, name)
 
-    pyro_module = types.ModuleType("Pyro5")
-    api_module = types.ModuleType("Pyro5.api")
-    errors_module = types.ModuleType("Pyro5.errors")
+    def __enter__(self):
+        return self
 
-    def expose(obj):
-        return obj
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
 
-    def oneway(obj):
-        return obj
+class RaftAdvancedTests(unittest.TestCase):
+    def setUp(self):
+        self.node_ids = [1, 2, 3]
+        self.nodes = {i: RaftNode(i) for i in self.node_ids}
+        self.fail_nodes = set()
 
-    def behavior(**_kwargs):
-        def decorator(obj):
-            return obj
+    def get_proxy_mock(self, uri):
+        return MockProxy(uri, self.nodes, self.fail_nodes)
 
-        return decorator
+    @patch("Pyro5.api.Proxy")
+    @patch("Pyro5.api.locate_ns")
+    def test_ns_resilience_follower(self, mock_locate_ns, mock_proxy_class):
+        mock_proxy_class.side_effect = self.get_proxy_mock
+        mock_locate_ns.side_effect = RuntimeError("NS DOWN")
+        
+        follower = self.nodes[1]
+        follower.leader_id = 2
+        follower.leader_ns_valid = False
+        
+        follower.appendEntries(term=1, leader_id=2, prev_log_index=0, prev_log_term=0, entries=[], leader_commit=0)
+        
+        follower._validate_leader_in_ns(2)
+        
+        self.assertTrue(follower.leader_ns_valid)
+        
+    @patch("Pyro5.api.Proxy")
+    @patch("Pyro5.api.locate_ns")
+    def test_follower_catchup(self, mock_locate_ns, mock_proxy_class):
+        mock_proxy_class.side_effect = self.get_proxy_mock
+        mock_ns = MagicMock()
+        mock_locate_ns.return_value.__enter__.return_value = mock_ns
+        
+        leader = self.nodes[1]
+        leader._become_leader()
+        
+        self.fail_nodes.add(3)
+        
+        leader.client_command("CMD1")
+        leader.client_command("CMD2")
+        
+        self.assertEqual(len(leader.log), 2)
+        self.assertEqual(len(self.nodes[2].log), 2)
+        self.assertEqual(len(self.nodes[3].log), 0)
+        
+        self.fail_nodes.remove(3)
+        
+        leader._send_heartbeats()
+        
+        time.sleep(0.5) 
+        
+        self.assertEqual(len(self.nodes[3].log), 2)
+        self.assertEqual(self.nodes[3].log[1]["command"], "CMD2")
 
-    class DummyDaemon:
-        def __init__(self, *args, **kwargs):
-            # Apenas para preencher a interface
-            pass
+    @patch("Pyro5.api.Proxy")
+    @patch("Pyro5.api.locate_ns")
+    def test_leader_replacement_and_return(self, mock_locate_ns, mock_proxy_class):
+        mock_proxy_class.side_effect = self.get_proxy_mock
+        mock_ns = MagicMock()
+        mock_locate_ns.return_value.__enter__.return_value = mock_ns
+        
+        leader1 = self.nodes[1]
+        leader1._start_election()
+        time.sleep(0.1)
+        self.assertEqual(leader1.state, "Lider")
+        self.assertEqual(leader1.current_term, 1)
+        
+        self.fail_nodes.add(1)
+        
+        node2 = self.nodes[2]
+        node2._start_election()
+        
+        time.sleep(0.5)
+        
+        self.assertEqual(node2.state, "Lider")
+        self.assertEqual(node2.current_term, 2)
+        
+        node2.client_command("NEW_LEADER_CMD")
+        
+        self.fail_nodes.remove(1)
+        
+        node2._send_heartbeats()
+        time.sleep(0.2)
+        
+        self.assertEqual(leader1.state, "Seguidor")
+        self.assertEqual(leader1.current_term, 2)
+        self.assertEqual(leader1.leader_id, 2)
+        self.assertEqual(len(leader1.log), 1)
 
-        def register(self, *args, **kwargs):
-            return None
-
-        def requestLoop(self, *args, **kwargs): # noqa # Funcao interna
-            return None
-
-        def shutdown(self):
-            return None
-
-    class DummyProxy:
-        def __init__(self, *_args, **_kwargs):
-            raise RuntimeError("Proxy nao disponivel no teste unitario")
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
-            return False
-
-    class DummyNs:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
-            return False
-
-        def register(self, *_args, **_kwargs):
-            return None
-
-        def lookup(self, *_args, **_kwargs):
-            return "PYRO:stub@localhost:5001"
-
-    api_module.__dict__.update({
-        "expose": expose,
-        "oneway": oneway,
-        "behavior": behavior,
-        "Daemon": DummyDaemon,
-        "Proxy": DummyProxy,
-        "locate_ns": lambda **_kwargs: DummyNs(),
-    })
-
-    pyro_module.__dict__.update({
-        "api": api_module,
-        "errors": errors_module,
-    })
-
-    sys.modules["Pyro5"] = pyro_module
-    sys.modules["Pyro5.api"] = api_module
-    sys.modules["Pyro5.errors"] = errors_module
-
-
-_install_pyro_stub()
-
-
-class RaftNodeTests(unittest.TestCase):
-    def test_follower_vote_when_candidate_log_is_up_to_date(self):
-        node = RaftNode(1)
-        # Atualizado para camelCase e voteGranted
-        response = node.requestVote(term=1, candidate_id=2, last_log_index=0, last_log_term=0)
-        self.assertTrue(response["voteGranted"])
-        self.assertEqual(node.voted_for, 2)
-        self.assertEqual(node.current_term, 1)
-
-    def test_append_entries_persists_log_fields(self):
-        node = RaftNode(2)
-        node.current_term = 1
-        # Atualizado para camelCase
-        response = node.appendEntries(
-            term=1,
-            leader_id=1,
-            prev_log_index=0,
-            prev_log_term=0,
-            entries=[{"term": 1, "index": 1, "command": "Teste 123"}],
-            leader_commit=0,
-        )
-
-        self.assertTrue(response["success"])
-        self.assertEqual(len(node.log), 1)
-        self.assertEqual(node.log[0]["term"], 1)
-        self.assertEqual(node.log[0]["index"], 1)
-        self.assertEqual(node.log[0]["command"], "Teste 123")
-
-    def test_client_command_redirects_when_not_leader(self):
-        node = RaftNode(3)
-        node.state = "Seguidor"
-        response = node.client_command("SET y 20")
-        self.assertFalse(response["success"])
-        self.assertEqual(response["reason"], "not_leader")
-
+    @patch("Pyro5.api.Proxy")
+    @patch("Pyro5.api.locate_ns")
+    def test_async_ns_registration(self, mock_locate_ns, mock_proxy_class):
+        mock_proxy_class.side_effect = self.get_proxy_mock
+        
+        def slow_ns(*args, **kwargs):
+            time.sleep(0.3)
+            return MagicMock()
+        mock_locate_ns.side_effect = slow_ns
+        
+        leader = self.nodes[1]
+        start_time = time.time()
+        
+        leader._become_leader()
+        
+        duration = time.time() - start_time
+        self.assertLess(duration, 0.1)
+        self.assertEqual(leader.state, "Lider")
+        
+        time.sleep(0.5)
 
 if __name__ == "__main__":
     unittest.main()

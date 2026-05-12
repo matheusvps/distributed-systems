@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import Pyro5.api
 
+Pyro5.config.COMMTIMEOUT = 0.5
+
 NODE_IDS = [1, 2, 3, 4]
 NODE_PORTS = {1: 5001, 2: 5002, 3: 5003, 4: 5004}
 NODE_OBJECT_IDS = {
@@ -17,10 +19,8 @@ NAMESERVER_HOST = "localhost"
 NAMESERVER_PORT = 9090
 LEADER_NS_NAME = "Lider"
 
-
 def build_uri(node_id: int) -> str:
     return f"PYRO:{NODE_OBJECT_IDS[node_id]}@localhost:{NODE_PORTS[node_id]}"
-
 
 @Pyro5.api.behavior(instance_mode="single")
 class RaftNode:
@@ -46,7 +46,10 @@ class RaftNode:
         self.next_index: Dict[int, int] = {}
         self.peer_alive: Dict[int, bool] = dict.fromkeys(self.peers, True)
         self.ns_registered = False
+        self.leader_ns_valid = True
+        self.last_ns_check = 0.0
         self.last_commit_log_sent: Dict[int, int] = dict.fromkeys(NODE_IDS, 0)
+        self._registration_in_progress = False
 
         self.running = False
         self.lock = threading.RLock()
@@ -89,20 +92,46 @@ class RaftNode:
         with self.lock:
             state = self.state
             deadline = self.election_deadline
+            leader_id = self.leader_id
         
         now = time.time()
         if state == "Lider":
             self._leader_tick(now)
-        elif now >= deadline:
-            self._start_election()
+        else:
+            if leader_id and (now - self.last_ns_check > 2.0):
+                threading.Thread(target=self._validate_leader_in_ns, args=(leader_id,), daemon=True).start()
+                self.last_ns_check = now
+
+            if now >= deadline:
+                self._start_election()
+
+    def _validate_leader_in_ns(self, leader_id: int) -> None:
+        try:
+            with Pyro5.api.locate_ns(host=NAMESERVER_HOST, port=NAMESERVER_PORT) as ns:
+                uri = ns.lookup(LEADER_NS_NAME)
+                expected_uri = build_uri(leader_id)
+                self.leader_ns_valid = (str(uri) == expected_uri)
+                if not self.leader_ns_valid:
+                    self._log(f"AVISO: Líder node{leader_id} não é o registrado no NS (esperado: {expected_uri}, obtido: {uri})")
+        except Exception:
+            if not self.leader_ns_valid:
+                self._log("Name Server indisponível, mas permitindo operação via heartbeats.")
+            self.leader_ns_valid = True
 
     def _leader_tick(self, now: float) -> None:
         if now - self.last_heartbeat_sent >= self.heartbeat_interval:
             self._send_heartbeats()
         
-        if not self.ns_registered and self._register_as_leader():
-            self.ns_registered = True
-            self._log(f"Sucesso: Lider registrado no Name Server como '{LEADER_NS_NAME}'")
+        if not self.ns_registered and not self._registration_in_progress:
+            self._registration_in_progress = True
+            threading.Thread(target=self._async_register, daemon=True).start()
+
+    def _async_register(self) -> None:
+        if self._register_as_leader():
+            with self.lock:
+                self.ns_registered = True
+                self._log(f"Sucesso: Lider registrado no Name Server como '{LEADER_NS_NAME}'")
+        self._registration_in_progress = False
 
     def _last_log_info(self) -> Tuple[int, int]:
         if not self.log:
@@ -117,22 +146,8 @@ class RaftNode:
         return last_log_index >= my_last_index
 
     def _start_election(self) -> None:
-        try:
-            with Pyro5.api.locate_ns(host=NAMESERVER_HOST, port=NAMESERVER_PORT) as ns:
-                existing_uri = ns.lookup(LEADER_NS_NAME)
-                if existing_uri and existing_uri != self.uri:
-                    try:
-                        with Pyro5.api.Proxy(existing_uri) as proxy:
-                            proxy._pyroTimeout = 1.0
-                            proxy.get_status()
-                        self._reset_election_deadline()
-                        return
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
         self._log(f"timeout de heartbeat atingido! Iniciando eleicao no termo {self.current_term + 1}")
+
         with self.lock:
             self.state = "Candidato"
             self.current_term += 1
@@ -197,12 +212,9 @@ class RaftNode:
         self.last_heartbeat_sent = 0.0
         self.next_index = {p_id: len(self.log) + 1 for p_id in self.peers}
         
-        if self._register_as_leader():
-            self.ns_registered = True
-            self._log(f"eleito LIDER no termo {self.current_term} (registrado no Name Server como '{LEADER_NS_NAME}')")
-        else:
-            self.ns_registered = False
-            self._log(f"eleito LIDER no termo {self.current_term}, mas falhou ao registrar no Name Server (tentando novamente)")
+        self._registration_in_progress = True
+        threading.Thread(target=self._async_register, daemon=True).start()
+        self._log(f"eleito LIDER no termo {self.current_term}, iniciando registro no Name Server...")
 
     def _become_follower(self, new_term: int, leader_id: Optional[int]) -> None:
         if self.state == "Lider" and self.current_term < new_term:
@@ -243,7 +255,7 @@ class RaftNode:
                 daemon=True
             ).start()
 
-    def sendEntry(self, peer_id: int, peer_uri: str, term: int, entries: List[Dict], prev_idx: int, prev_term: int, commit_idx: int) -> bool:  # type: ignore
+    def sendEntry(self, peer_id: int, peer_uri: str, term: int, entries: List[Dict], prev_idx: int, prev_term: int, commit_idx: int) -> bool:
         is_alive_before = self.peer_alive.get(peer_id, True)
         try:
             if is_alive_before:
@@ -366,7 +378,7 @@ class RaftNode:
                 self._log(f"falha ao enviar commit: {exc}", peer_id=peer_id)
 
     @Pyro5.api.expose
-    def requestVote(self, term: int, candidate_id: int, last_log_index: int, last_log_term: int) -> Dict:  # type: ignore
+    def requestVote(self, term: int, candidate_id: int, last_log_index: int, last_log_term: int) -> Dict:
         with self.lock:
             if term < self.current_term:
                 return {"term": self.current_term, "voteGranted": False}
@@ -387,7 +399,7 @@ class RaftNode:
             return {"term": self.current_term, "voteGranted": False}
 
     @Pyro5.api.expose
-    def appendEntries(  # type: ignore
+    def appendEntries(
         self,
         term: int,
         leader_id: int,

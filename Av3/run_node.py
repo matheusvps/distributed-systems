@@ -4,7 +4,6 @@ import subprocess
 
 from raft_node import NODE_IDS, RaftNode
 
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Executa um no Raft com PyRO5.")
     parser.add_argument("--id", type=int, required=True, help="ID do no (1-4).")
@@ -15,7 +14,6 @@ def main() -> None:
 
     node = RaftNode(args.id)
     node.start()
-
 
 if __name__ == "__main__":
     main()
