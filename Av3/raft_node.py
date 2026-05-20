@@ -211,6 +211,7 @@ class RaftNode:
         self.leader_id = self.node_id
         self.last_heartbeat_sent = 0.0
         self.next_index = {p_id: len(self.log) + 1 for p_id in self.peers}
+        self.last_commit_log_sent = {p_id: self.commit_index for p_id in NODE_IDS}
         
         self._registration_in_progress = True
         threading.Thread(target=self._async_register, daemon=True).start()
