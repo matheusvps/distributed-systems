@@ -1,0 +1,4 @@
+**/target/
+**/data/
+run-local.sh
+*.log

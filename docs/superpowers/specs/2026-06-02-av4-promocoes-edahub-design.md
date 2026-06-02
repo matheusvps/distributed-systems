@@ -1,139 +1,82 @@
-# Av4 — Plataforma Distribuída de Promoções (EDA + GraphQL + SSE)
+# Av4 — Plataforma Distribuída de Promoções (EDA · Java + Nuxt)
 
-Data: 2026-06-02
+Data: 2026-06-02 (revisado 2x)
 Autores: Matheus Vinicius Passos de Santana, Lucas Yukio Fukuda Matsumoto
+
+> **Histórico de revisão.** v1: Java/Spring + GraphQL + React. v2: Node + REST + Streamlit
+> (reaproveitando o Trab1). **v3 (atual e implementada): backend 100% Java/Spring Boot +
+> frontend 100% Nuxt 3/Vue 3, REST + SSE.** Migração do Trab1 (Node) preservando eventos,
+> exchanges/filas, regras e assinatura RSA.
 
 ## Objetivo
 
-Plataforma web onde lojas cadastram promoções, consumidores consultam/votam/seguem
-categorias, promoções populares viram "hot deals", notificações chegam em tempo real
-via SSE e lojas recebem e-mails. Toda comunicação entre microsserviços ocorre
-**exclusivamente via RabbitMQ** — nenhuma chamada direta entre serviços.
+Plataforma web: lojas cadastram promoções (assinadas), consumidores consultam/votam/seguem
+categorias, promoções populares viram "hot deals", notificações em tempo real via SSE e
+lojas recebem e-mail. Comunicação entre microsserviços **exclusivamente via RabbitMQ**.
 
-Av4 é a evolução web do `Trab1` (CLI Node.js já existente neste repositório), reusando
-o modelo de eventos assinados em RSA, mas reescrito em Java/Spring Boot com API GraphQL,
-SSE, bancos por serviço e Docker Compose.
+## Stack
 
-## Decisões técnicas (com justificativa para a defesa)
+- **Backend**: Java 21, Spring Boot 3.3 (Web, AMQP, Data JPA, Validation), Maven multi-módulo,
+  Lombok, Jackson. SSE via Spring MVC `SseEmitter`. RSA `SHA256withRSA`.
+- **Frontend**: Nuxt 3, Vue 3 (Composition API), Pinia, Tailwind, `EventSource` nativo.
+- **Infra**: RabbitMQ (2 topic exchanges), PostgreSQL (1 banco lógico por serviço; H2 local),
+  Docker Compose, serviço `keygen` (OpenSSL) gerando o volume `keys/`.
 
-1. **Backend Java 21 + Spring Boot** — cumpre o requisito "frontend em linguagem
-   diferente do backend" (frontend é React/TypeScript).
-2. **GraphQL puro** (Spring for GraphQL + Apollo Client) — a pedido do autor. Diverge do
-   "REST" sugerido no enunciado; divergência documentada. As ações do enunciado
-   (cadastrar, listar, votar, seguir/cancelar categoria) viram queries/mutations.
-3. **Subscriptions GraphQL transportadas via SSE** (`graphql-sse`) — mantém GraphQL puro
-   E satisfaz o requisito explícito de notificações em tempo real via SSE.
-4. **1 PostgreSQL com 4 bancos lógicos** (`gateway_db`, `promocao_db`, `ranking_db`,
-   `notificacao_db`) — cumpre "não compartilhar banco" sem o peso de 4 containers.
-5. **Resend real** — requer `RESEND_API_KEY`. Sem a chave, o envio de e-mail falha e é
-   logado, mas o restante do fluxo (eventos, SSE) continua.
-6. **Assinatura RSA-2048 + SHA-256**, canonical JSON determinístico, anti-replay via
-   `eventId` único + `timestamp` (janela de 5 min).
-7. **Sem código compartilhado entre serviços** — cada microsserviço é standalone
-   (pequena duplicação utilitária de envelope/assinatura) para independência real.
-8. **Limiar de hot deal = 5** (configurável via `HOT_DEAL_THRESHOLD`).
-9. **Sem autenticação real** — `consumerId`/`lojaId` são identificadores simples
-   fornecidos pelo frontend (escopo acadêmico).
+## Decisões técnicas
 
-## Arquitetura
+1. **Maven multi-módulo** com `shared-lib` (envelope, RSA, constantes de mensageria, config
+   Jackson/AMQP, `DomainEventPublisher`) reusada pelos 4 serviços.
+2. **Gateway como ponto de entrada confiável**: assina `promocao.recebida` e `promocao.voto`
+   em nome de loja/usuário; os MS verificam. Evita gerir par de chaves por loja no frontend.
+3. **Chaves RSA em volume compartilhado** (`keys/`): cada serviço tem sua privada e lê
+   qualquer pública para verificar (`KeyLoader` resolve `<source>.public.pem`).
+4. **JSON canônico determinístico** (`CanonicalJson`): chaves ordenadas + números
+   normalizados (`BigDecimal.stripTrailingZeros`), robusto ao round-trip POJO→wire→Map.
+5. **Persistência por serviço** via JPA (entities/repositories/DTOs); H2 (file) local,
+   PostgreSQL no compose (`gateway_db/promocao_db/ranking_db/notificacao_db`).
+6. **SSE real** no Gateway (`/api/notificacoes/stream`, `EventSource`), filtrado por
+   interesse de categoria + endpoint de polling de apoio.
+7. **E-mail Resend (real)** via `HttpClient`; sem `RESEND_API_KEY` cai para mock (loga).
+8. **Robustez de mensageria**: listener com `defaultRequeueRejected=false` (sem storm de
+   poison messages) e mapper com `FAIL_ON_UNKNOWN_PROPERTIES=false`.
+9. **Limiar de hot deal = 5** (`HOT_DEAL_THRESHOLD`); destaque idempotente (flag `hotPublished`).
 
-- **Frontend** (React+TS): fala só com o Gateway via GraphQL HTTP + subscriptions SSE.
-- **Gateway** (Spring Boot): expõe GraphQL, mantém conexões SSE, traduz ações em eventos
-  RabbitMQ, consome notificações e filtra por interesse de cada usuário. Mantém estado de
-  lojas (com par de chaves) e interesses por categoria em `gateway_db`.
-- **MS Promoção**: consome `promocao.recebida`, valida assinatura + anti-replay, persiste,
-  publica `promocao.publicada`.
-- **MS Ranking**: consome `promocao.voto`, valida, atualiza score, ao atingir o limiar
-  publica `promocao.destaque`.
-- **MS Notificação**: consome `promocao.publicada` e `promocao.destaque`, valida, envia
-  e-mail (Resend) à loja e publica `promocao.categoria` / `notificacao.hotdeal` para o
-  Gateway (SSE).
-- **RabbitMQ**: dois topic exchanges — `promocoes.events` (eventos de domínio) e
-  `promocoes.notificacoes` (notificações destinadas ao Gateway).
+## Eventos
 
-## Eventos (envelope assinado)
+Envelope: `{ eventId, type, timestamp, source, signature, payload }`. Exchanges
+`promocoes.events` e `promocoes.notificacoes`. Eventos e payloads detalhados em
+`Av4/docs/payloads.md`.
 
-```jsonc
-{
-  "eventId": "uuid-v4",
-  "eventType": "promocao.recebida",
-  "producer": "loja:<id> | gateway | promocao | ranking | notificacao",
-  "timestamp": "ISO-8601 UTC",
-  "version": 1,
-  "payload": { ... },
-  "signature": "base64(RSA-SHA256(canonicalJSON(envelope sem signature)))"
-}
-```
-
-| Evento | Exchange | Produtor → Consumidor | Assinado por |
+| Evento | Exchange | Produtor → Consumidor | source |
 |---|---|---|---|
-| `promocao.recebida`  | events        | Gateway → Promoção     | loja |
-| `promocao.publicada` | events        | Promoção → Notificação | promocao |
-| `promocao.voto`      | events        | Gateway → Ranking      | gateway |
-| `promocao.destaque`  | events        | Ranking → Notificação  | ranking |
-| `promocao.categoria` | notificacoes  | Notificação → Gateway  | notificacao |
-| `notificacao.hotdeal`| notificacoes  | Notificação → Gateway  | notificacao |
+| `promocao.recebida`  | events       | Gateway → Promoção     | gateway |
+| `promocao.publicada` | events       | Promoção → Gateway/Notificação | promocao |
+| `promocao.voto`      | events       | Gateway → Ranking      | gateway |
+| `promocao.destaque`  | events       | Ranking → Notificação/Gateway | ranking |
+| `promocao.categoria.<cat>` | notificacoes | Notificação → Gateway | notificacao |
 
-Anti-replay: cada serviço grava `eventId` processado na tabela `Evento` e rejeita
-duplicatas e timestamps fora da janela.
+## Contrato REST (Gateway, 8080)
 
-## Contrato GraphQL (Gateway)
+`GET /api/health`, `GET /api/categorias`, `POST /api/promocoes`,
+`GET /api/promocoes?category=&hot=`, `POST /api/promocoes/{id}/voto`,
+`POST /api/interesses`, `DELETE /api/interesses`, `GET /api/interesses?consumerId=`,
+`GET /api/notificacoes/stream?consumerId=` (SSE), `GET /api/notificacoes?consumerId=&since=`.
 
-Queries: `promocoes(categoria, apenasHot)`, `promocao(id)`, `categorias`,
-`minhasCategorias(consumerId)`.
-Mutations: `registrarLoja`, `cadastrarPromocao`, `votar`, `seguirCategoria`,
-`deixarCategoria`.
-Subscription: `notificacoes(consumerId)` (transporte SSE).
-
-Tipos: `Promocao`, `Loja`, `Notificacao`, `VotoResult`, enum `TipoNotificacao`.
-
-## Bancos de dados (1 Postgres, 4 DBs)
-
-- **gateway_db**: `loja` (id, nome, email, public_key, private_key), `interesse`
-  (consumer_id, categoria).
-- **promocao_db**: `promocao` (id, titulo, descricao, categoria, preco, preco_original,
-  loja_id, loja_email, status, criada_em), `loja_chave` (loja_id, public_key),
-  `evento` (event_id, processado_em).
-- **ranking_db**: `voto` (id, promocao_id, consumer_id, valor), `score` (promocao_id,
-  total, hot), `evento`.
-- **notificacao_db**: `notificacao` (id, tipo, titulo, mensagem, promocao_id, categoria,
-  loja_email, criada_em), `evento`.
-
-## Segurança / chaves
-
-- RSA-2048. Pares dos serviços gerados por um container `keygen` no boot, gravados num
-  volume `keys/`. Públicas distribuídas a quem verifica.
-- Par da loja gerado no `registrarLoja` (Gateway), privada guardada em `gateway_db`,
-  pública publicada para o MS Promoção (via evento `promocao.recebida` carregando a
-  pública na primeira vez OU registro prévio — usaremos: pública embarcada no payload do
-  primeiro `promocao.recebida` e persistida em `promocao_db.loja_chave`; assinatura
-  verificada contra a pública registrada).
-
-## Estrutura de pastas
+## Estrutura
 
 ```
 Av4/
-├── docker-compose.yml
-├── .env.example
-├── README.md
-├── docs/{arquitetura,eventos,payloads,diagramas}.md
-├── infra/{postgres/init.sql, rabbitmq/definitions.json, keygen/}
-├── keys/                         (volume compartilhado)
-├── frontend/                     (React+TS+Vite+Apollo+graphql-sse)
-└── services/{gateway,promocao,ranking,notificacao}/   (Spring Boot standalone)
+├── keys/  ·  scripts/generate-keys.sh  ·  docs/payloads.md  ·  .env.example  ·  README.md
+├── backend/  (pom.xml, Dockerfile, docker-compose.yml, infra/postgres/init.sql,
+│              shared-lib/, gateway-service/, promocao-service/, ranking-service/, notificacao-service/)
+└── frontend/ (Nuxt 3: app.vue, pages/, components/, composables/, stores/, services/)
 ```
 
-## Entregáveis
+## Critérios de aceitação (verificados)
 
-Código completo (frontend + 4 serviços), config RabbitMQ, init dos bancos, Docker
-Compose, docs de arquitetura/eventos, instruções de execução, exemplos de payloads,
-diagramas mermaid.
-
-## Critérios de aceitação
-
-- Subir tudo com `docker compose up` e abrir o frontend.
-- Cadastrar promoção → e-mail à loja + notificação SSE a quem segue a categoria.
-- Votar até o limiar → evento de destaque → e-mail "hot deal" + SSE.
+- `docker compose up --build` sobe rabbit + postgres + keygen + 4 serviços + frontend.
+- Cadastrar promoção → e-mail "aprovada" + notificação SSE a quem segue a categoria.
+- Votar até o limiar → `promocao.destaque` → e-mail "hot deal" + SSE + catálogo `hot=true`.
 - Seguir/cancelar categoria altera o que chega via SSE.
 - Nenhuma chamada direta entre serviços (só RabbitMQ).
-- Eventos com assinatura inválida são rejeitados.
+- Evento com assinatura inválida é rejeitado e logado.

@@ -1,0 +1,30 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: promocao-service
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+  datasource:
+    url: ${DB_URL:jdbc:h2:file:./data/promocao;AUTO_SERVER=TRUE}
+    username: ${DB_USER:sa}
+    password: ${DB_PASS:}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: ${DB_DIALECT:org.hibernate.dialect.H2Dialect}
+
+promocoes:
+  # Diretorio compartilhado de chaves RSA (volume keys/). Em docker: /keys
+  keys-dir: ${KEYS_DIR:../../keys}
+
+logging:
+  level:
+    com.promocoes: INFO

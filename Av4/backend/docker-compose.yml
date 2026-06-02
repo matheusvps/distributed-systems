@@ -1,0 +1,165 @@
+# Orquestracao completa: RabbitMQ + PostgreSQL + keygen (chaves RSA) + 4 microsservicos Java + frontend Nuxt.
+# Subir tudo:  docker compose up --build
+# (rode a partir de Av4/backend; o frontend usa contexto ../frontend)
+name: promocoes-av4
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: av4-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: av4-postgres
+    environment:
+      POSTGRES_USER: promo
+      POSTGRES_PASSWORD: promo
+      POSTGRES_DB: promo
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U promo"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Gera os pares RSA dos 4 servicos no volume compartilhado "keys" (executa e sai).
+  keygen:
+    image: alpine:3.20
+    container_name: av4-keygen
+    volumes:
+      - keys:/keys
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        apk add --no-cache openssl >/dev/null;
+        for s in gateway promocao ranking notificacao; do
+          if [ ! -f /keys/$$s.private.pem ]; then
+            openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /keys/$$s.private.pem 2>/dev/null;
+            openssl pkey -in /keys/$$s.private.pem -pubout -out /keys/$$s.public.pem 2>/dev/null;
+            echo "chaves de $$s geradas";
+          fi;
+        done;
+        echo "chaves prontas:"; ls -1 /keys
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: gateway-service
+    container_name: av4-gateway
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      keygen: { condition: service_completed_successfully }
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      DB_URL: jdbc:postgresql://postgres:5432/gateway_db
+      DB_USER: promo
+      DB_PASS: promo
+      DB_DRIVER: org.postgresql.Driver
+      DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      KEYS_DIR: /keys
+    ports:
+      - "8080:8080"
+    volumes:
+      - keys:/keys:ro
+
+  promocao-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: promocao-service
+    container_name: av4-promocao
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      keygen: { condition: service_completed_successfully }
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      DB_URL: jdbc:postgresql://postgres:5432/promocao_db
+      DB_USER: promo
+      DB_PASS: promo
+      DB_DRIVER: org.postgresql.Driver
+      DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      KEYS_DIR: /keys
+    volumes:
+      - keys:/keys:ro
+
+  ranking-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: ranking-service
+    container_name: av4-ranking
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      keygen: { condition: service_completed_successfully }
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      DB_URL: jdbc:postgresql://postgres:5432/ranking_db
+      DB_USER: promo
+      DB_PASS: promo
+      DB_DRIVER: org.postgresql.Driver
+      DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      HOT_DEAL_THRESHOLD: ${HOT_DEAL_THRESHOLD:-5}
+      KEYS_DIR: /keys
+    volumes:
+      - keys:/keys:ro
+
+  notificacao-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: notificacao-service
+    container_name: av4-notificacao
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      keygen: { condition: service_completed_successfully }
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      DB_URL: jdbc:postgresql://postgres:5432/notificacao_db
+      DB_USER: promo
+      DB_PASS: promo
+      DB_DRIVER: org.postgresql.Driver
+      DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-resend}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Promocoes <onboarding@resend.dev>}
+      KEYS_DIR: /keys
+    volumes:
+      - keys:/keys:ro
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: av4-frontend
+    depends_on:
+      - gateway-service
+    environment:
+      # URL usada pelo NAVEGADOR (REST + EventSource), portanto host exposto.
+      NUXT_PUBLIC_GATEWAY_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+
+volumes:
+  keys:
+  pgdata:
