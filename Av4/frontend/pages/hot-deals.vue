@@ -35,7 +35,7 @@ async function onVote(id: string, vote: 1 | -1) {
   votingId.value = id
   try {
     await api.vote(id, { vote, consumerId: user.consumerId })
-    toast.success(vote === 1 ? 'Voto positivo registrado 👍' : 'Voto negativo registrado 👎')
+    toast.success(vote === 1 ? 'Voto positivo registrado' : 'Voto negativo registrado')
   } catch (e: any) {
     toast.error(e?.data?.message || e?.message || 'Não foi possível votar')
   } finally {
@@ -46,9 +46,15 @@ async function onVote(id: string, vote: 1 | -1) {
 
 <template>
   <div>
-    <PageHeader title="🔥 Hot Deals" subtitle="As ofertas em alta com mais engajamento">
+    <PageHeader
+      eyebrow="Em alta"
+      title="Hot Deals"
+      subtitle="As ofertas com mais engajamento, impulsionadas em tempo real pelos votos da comunidade."
+    >
       <template #actions>
-        <button class="btn-ghost btn-sm" :disabled="loading" @click="load">↻ Atualizar</button>
+        <button class="btn-ghost btn-sm" :disabled="loading" @click="load">
+          <Icon name="refresh" :size="15" :class="loading ? 'animate-spin' : ''" /> Atualizar
+        </button>
       </template>
     </PageHeader>
 
@@ -58,7 +64,7 @@ async function onVote(id: string, vote: 1 | -1) {
 
     <EmptyState
       v-else-if="error"
-      icon="⚠️"
+      icon="alert"
       title="Erro ao carregar"
       :subtitle="error"
     >
@@ -67,7 +73,7 @@ async function onVote(id: string, vote: 1 | -1) {
 
     <EmptyState
       v-else-if="!items.length"
-      icon="🔥"
+      icon="flame"
       title="Nenhum hot deal no momento"
       subtitle="Vote nas promoções para impulsionar as melhores ofertas ao topo."
     />

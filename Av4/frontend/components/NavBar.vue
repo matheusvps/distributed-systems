@@ -6,28 +6,28 @@ const notif = useNotificacoesStore()
 const badge = computed(() => notif.unread)
 
 const links = [
-  { to: '/', label: 'Promoções', icon: '🏷️' },
-  { to: '/hot-deals', label: 'Hot Deals', icon: '🔥' },
-  { to: '/cadastro', label: 'Cadastrar', icon: '➕' },
-  { to: '/interesses', label: 'Interesses', icon: '⭐' },
-  { to: '/notificacoes', label: 'Notificações', icon: '🛎️' }
+  { to: '/', label: 'Promoções', icon: 'tag' },
+  { to: '/hot-deals', label: 'Hot Deals', icon: 'flame' },
+  { to: '/cadastro', label: 'Cadastrar', icon: 'plus' },
+  { to: '/interesses', label: 'Interesses', icon: 'bookmark' },
+  { to: '/notificacoes', label: 'Notificações', icon: 'bell' }
 ]
 </script>
 
 <template>
-  <nav class="flex flex-col gap-1">
+  <nav class="flex flex-col gap-0.5">
     <NuxtLink
       v-for="l in links"
       :key="l.to"
       :to="l.to"
-      class="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-      active-class="bg-brand-50 text-brand-700 hover:bg-brand-50"
+      class="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-700 transition-colors hover:bg-bone-200/70"
+      active-class="!bg-pine-800 !text-bone-50 shadow-card hover:!bg-pine-800"
     >
-      <span class="text-base">{{ l.icon }}</span>
+      <Icon :name="l.icon" :size="18" class="opacity-80 transition-opacity group-hover:opacity-100" />
       <span class="flex-1">{{ l.label }}</span>
       <span
         v-if="l.to === '/notificacoes' && badge > 0"
-        class="badge min-w-5 justify-center bg-brand-600 px-1.5 text-white"
+        class="badge nums min-w-[1.25rem] justify-center bg-acid-300 px-1.5 text-pine-900"
       >
         {{ badge > 99 ? '99+' : badge }}
       </span>

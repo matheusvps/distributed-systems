@@ -81,7 +81,11 @@ async function submit() {
 
 <template>
   <div class="mx-auto max-w-2xl">
-    <PageHeader title="Cadastrar promoção" subtitle="Publique uma oferta da sua loja" />
+    <PageHeader
+      eyebrow="Nova oferta"
+      title="Cadastrar promoção"
+      subtitle="Publique uma oferta da sua loja. Ela será validada antes de entrar no catálogo."
+    />
 
     <form class="card space-y-5 p-6" novalidate @submit.prevent="submit">
       <div>
@@ -172,10 +176,11 @@ async function submit() {
         </p>
       </div>
 
-      <div class="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
-        <span class="text-xs text-slate-400">A oferta será validada antes de publicar.</span>
-        <button type="submit" class="btn-primary" :disabled="submitting">
-          <span v-if="submitting" class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+      <div class="flex flex-wrap items-center justify-end gap-3 border-t border-bone-200 pt-5">
+        <span class="mr-auto text-xs text-ink-400">A oferta será validada antes de publicar.</span>
+        <button type="submit" class="btn-accent" :disabled="submitting">
+          <span v-if="submitting" class="h-4 w-4 animate-spin rounded-full border-2 border-pine-900/30 border-t-pine-900" />
+          <Icon v-else name="plus" :size="16" :stroke-width="2.25" />
           {{ submitting ? 'Enviando…' : 'Publicar promoção' }}
         </button>
       </div>

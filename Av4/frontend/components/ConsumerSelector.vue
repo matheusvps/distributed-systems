@@ -24,25 +24,25 @@ function apply() {
 </script>
 
 <template>
-  <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
-    <label class="label">Usuário (consumerId)</label>
+  <div class="rounded-2xl border border-bone-200 bg-bone-100/60 p-3.5">
+    <label class="label">Usuário ativo</label>
     <div class="flex gap-2">
       <input
         v-model="draft"
-        class="input"
+        class="input nums"
         placeholder="cliente_a"
         @keyup.enter="apply"
       />
       <button class="btn-primary btn-sm shrink-0" @click="apply">Trocar</button>
     </div>
-    <div class="mt-2 flex flex-wrap gap-1.5">
+    <div class="mt-2.5 flex flex-wrap gap-1.5">
       <button
         v-for="p in presets"
         :key="p"
-        class="badge px-2 py-0.5 ring-1 ring-inset transition"
+        class="badge nums px-2.5 py-1 ring-1 ring-inset transition-all"
         :class="user.consumerId === p
-          ? 'bg-brand-600 text-white ring-brand-600'
-          : 'bg-white text-slate-500 ring-slate-200 hover:bg-slate-100'"
+          ? 'bg-pine-800 text-bone-50 ring-pine-800'
+          : 'bg-bone-50 text-ink-500 ring-bone-300 hover:ring-pine-300'"
         @click="draft = p; apply()"
       >
         {{ p }}

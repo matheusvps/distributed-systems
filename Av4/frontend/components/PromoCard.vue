@@ -23,64 +23,72 @@ const discount = computed(() => {
 </script>
 
 <template>
-  <article class="card group flex flex-col p-5 hover:-translate-y-0.5 hover:shadow-cardhover">
-    <header class="mb-3 flex items-start justify-between gap-3">
-      <div class="flex flex-wrap items-center gap-2">
-        <CategoryBadge :category="promo.category" />
-        <span v-if="promo.hot" class="badge bg-orange-100 text-orange-700">🔥 Hot deal</span>
-        <span
-          v-if="promo.status && promo.status !== 'published'"
-          class="badge bg-slate-100 text-slate-500"
-        >
-          {{ promo.status }}
-        </span>
-      </div>
+  <article
+    class="card group relative flex flex-col overflow-hidden p-5 hover:-translate-y-1 hover:border-pine-300 hover:shadow-cardhover"
+    :class="promo.hot ? 'ring-1 ring-acid-300' : ''"
+  >
+    <!-- Discount tab in the top-right corner -->
+    <div
+      v-if="discount"
+      class="absolute right-0 top-0 flex flex-col items-center rounded-bl-2xl bg-pine-800 px-3 py-2 text-bone-50"
+    >
+      <span class="nums text-lg font-bold leading-none">-{{ discount }}%</span>
+      <span class="text-[0.6rem] uppercase tracking-wider text-pine-200">off</span>
+    </div>
+
+    <header class="mb-3 flex flex-wrap items-center gap-2 pr-12">
+      <CategoryBadge :category="promo.category" />
       <span
-        v-if="discount"
-        class="badge shrink-0 bg-emerald-100 text-emerald-700"
-        title="Desconto"
+        v-if="promo.hot"
+        class="badge bg-acid-300 text-pine-900"
       >
-        -{{ discount }}%
+        <Icon name="flame" :size="13" :stroke-width="2" /> Hot deal
+      </span>
+      <span
+        v-if="promo.status && promo.status !== 'published'"
+        class="badge bg-bone-200 text-ink-500 capitalize"
+      >
+        {{ promo.status }}
       </span>
     </header>
 
-    <h3 class="text-base font-semibold text-slate-900">
+    <h3 class="font-display text-lg font-bold leading-snug tracking-tight text-ink-900">
       {{ promo.title || 'Sem título' }}
     </h3>
-    <p v-if="promo.description" class="mt-1 line-clamp-3 text-sm text-slate-500">
+    <p v-if="promo.description" class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-ink-500">
       {{ promo.description }}
     </p>
 
-    <div class="mt-4 flex items-end gap-2">
-      <span v-if="price" class="text-2xl font-bold text-slate-900">{{ price }}</span>
-      <span v-if="original && discount" class="pb-1 text-sm text-slate-400 line-through">
+    <div class="mt-5 flex items-end gap-2.5">
+      <span v-if="price" class="nums text-2xl font-bold tracking-tight text-pine-800">{{ price }}</span>
+      <span v-if="original && discount" class="nums pb-1 text-sm text-ink-400 line-through">
         {{ original }}
       </span>
     </div>
 
-    <div class="mt-3 flex items-center gap-3 text-xs text-slate-500">
-      <span v-if="promo.store" class="inline-flex items-center gap-1">
-        🏬 {{ promo.store }}
+    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-500">
+      <span v-if="promo.store" class="inline-flex items-center gap-1.5">
+        <Icon name="store" :size="14" /> {{ promo.store }}
       </span>
-      <span v-if="typeof promo.score === 'number'" class="inline-flex items-center gap-1">
-        ⭐ {{ promo.score }}
+      <span v-if="typeof promo.score === 'number'" class="inline-flex items-center gap-1.5">
+        <Icon name="trending" :size="14" /> <span class="nums">{{ promo.score }}</span>
       </span>
     </div>
 
-    <footer class="mt-5 flex items-center gap-2 border-t border-slate-100 pt-4">
+    <footer class="mt-5 flex items-center gap-2 border-t border-bone-200 pt-4">
       <button
-        class="btn-ghost btn-sm flex-1 hover:border-emerald-300 hover:text-emerald-700"
+        class="btn-ghost btn-sm flex-1 hover:!ring-pine-400 hover:text-pine-700"
         :disabled="voting"
         @click="emit('vote', 1)"
       >
-        👍 Curtir
+        <Icon name="up" :size="15" /> Curtir
       </button>
       <button
-        class="btn-ghost btn-sm flex-1 hover:border-rose-300 hover:text-rose-700"
+        class="btn-ghost btn-sm flex-1 hover:!ring-rose-300 hover:text-rose-600"
         :disabled="voting"
         @click="emit('vote', -1)"
       >
-        👎 Não curtir
+        <Icon name="down" :size="15" /> Não curtir
       </button>
     </footer>
   </article>

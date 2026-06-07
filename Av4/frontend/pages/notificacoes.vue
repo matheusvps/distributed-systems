@@ -29,11 +29,11 @@ onMounted(() => connect(user.consumerId))
 watch(() => user.consumerId, (id) => connect(id))
 
 const statusMeta = computed<Record<SseStatus, { label: string; dot: string; text: string }>>(() => ({
-  idle: { label: 'Inativo', dot: 'bg-slate-300', text: 'text-slate-400' },
+  idle: { label: 'Inativo', dot: 'bg-bone-400', text: 'text-ink-400' },
   connecting: { label: 'Conectando…', dot: 'bg-amber-400 animate-pulse', text: 'text-amber-600' },
-  open: { label: 'Ao vivo', dot: 'bg-emerald-500 animate-pulse', text: 'text-emerald-600' },
+  open: { label: 'Ao vivo', dot: 'bg-pine-500 animate-pulse', text: 'text-pine-600' },
   error: { label: 'Reconectando…', dot: 'bg-rose-500 animate-pulse', text: 'text-rose-600' },
-  closed: { label: 'Desconectado', dot: 'bg-slate-400', text: 'text-slate-400' }
+  closed: { label: 'Desconectado', dot: 'bg-bone-400', text: 'text-ink-400' }
 }))
 const meta = computed(() => statusMeta.value[status.value])
 
@@ -45,16 +45,20 @@ function time(iso: string) {
   return new Date(iso).toLocaleTimeString('pt-BR')
 }
 function icon(type: string) {
-  return type === 'hotdeal' ? '🔥' : '🛎️'
+  return type === 'hotdeal' ? 'flame' : 'bell'
 }
 </script>
 
 <template>
   <div class="mx-auto max-w-3xl">
-    <PageHeader title="Notificações ao vivo" :subtitle="`Stream em tempo real para ${user.consumerId}`">
+    <PageHeader
+      eyebrow="Tempo real"
+      title="Notificações ao vivo"
+      :subtitle="`Stream de eventos em tempo real para ${user.consumerId}.`"
+    >
       <template #actions>
         <span
-          class="badge bg-white ring-1 ring-inset ring-slate-200"
+          class="badge bg-bone-50 ring-1 ring-inset ring-bone-300"
           :class="meta.text"
         >
           <span class="h-2 w-2 rounded-full" :class="meta.dot" />
@@ -70,24 +74,28 @@ function icon(type: string) {
       </template>
     </PageHeader>
 
-    <div class="mb-5 grid grid-cols-3 gap-3">
+    <div class="mb-6 grid grid-cols-3 gap-3">
       <div class="card p-4">
-        <p class="text-xs text-slate-400">Total</p>
-        <p class="text-xl font-bold text-slate-900">{{ store.unread }}</p>
+        <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Total</p>
+        <p class="nums mt-1 text-2xl font-bold text-ink-900">{{ store.unread }}</p>
       </div>
       <div class="card p-4">
-        <p class="text-xs text-slate-400">🔥 Hot deals</p>
-        <p class="text-xl font-bold text-orange-600">{{ store.hotCount }}</p>
+        <p class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-ink-400">
+          <Icon name="flame" :size="13" /> Hot deals
+        </p>
+        <p class="nums mt-1 text-2xl font-bold text-acid-600">{{ store.hotCount }}</p>
       </div>
       <div class="card p-4">
-        <p class="text-xs text-slate-400">🛎️ Categorias</p>
-        <p class="text-xl font-bold text-brand-600">{{ store.categoriaCount }}</p>
+        <p class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-ink-400">
+          <Icon name="bell" :size="13" /> Categorias
+        </p>
+        <p class="nums mt-1 text-2xl font-bold text-pine-600">{{ store.categoriaCount }}</p>
       </div>
     </div>
 
     <EmptyState
       v-if="!store.feed.length"
-      icon="🛎️"
+      icon="bell"
       title="Aguardando notificações"
       subtitle="Siga categorias em Interesses e mantenha esta página aberta para ver eventos chegando em tempo real."
     />
@@ -97,30 +105,39 @@ function icon(type: string) {
         <li
           v-for="n in store.feed"
           :key="n.localId"
-          class="card flex gap-3 p-4"
-          :class="n.type === 'hotdeal' ? 'border-l-4 border-l-orange-400' : 'border-l-4 border-l-brand-400'"
+          class="card flex gap-4 p-4"
+          :class="n.type === 'hotdeal' ? 'border-l-4 border-l-acid-400' : 'border-l-4 border-l-pine-500'"
         >
-          <div class="text-2xl leading-none">{{ icon(n.type) }}</div>
+          <div
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            :class="n.type === 'hotdeal' ? 'bg-acid-100 text-acid-700' : 'bg-pine-50 text-pine-700'"
+          >
+            <Icon :name="icon(n.type)" :size="20" />
+          </div>
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <span
                 class="badge"
-                :class="n.type === 'hotdeal' ? 'bg-orange-100 text-orange-700' : 'bg-brand-50 text-brand-700'"
+                :class="n.type === 'hotdeal' ? 'bg-acid-300 text-pine-900' : 'bg-pine-50 text-pine-700 ring-1 ring-inset ring-pine-100'"
               >
                 {{ n.type === 'hotdeal' ? 'Hot deal' : 'Categoria' }}
               </span>
               <CategoryBadge :category="n.category" />
-              <span v-if="n.tag" class="badge bg-slate-100 text-slate-500">{{ n.tag }}</span>
-              <span class="ml-auto text-xs text-slate-400">{{ time(n.receivedAt) }}</span>
+              <span v-if="n.tag" class="badge bg-bone-200 text-ink-500">{{ n.tag }}</span>
+              <span class="nums ml-auto text-xs text-ink-400">{{ time(n.receivedAt) }}</span>
             </div>
-            <p class="mt-1 text-sm font-medium text-slate-800">
+            <p class="mt-1.5 text-sm font-semibold text-ink-900">
               {{ n.title || n.message }}
             </p>
-            <p v-if="n.title && n.message" class="text-sm text-slate-500">{{ n.message }}</p>
-            <div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-400">
-              <span v-if="n.store">🏬 {{ n.store }}</span>
-              <span v-if="price(n.price)">{{ price(n.price) }}</span>
-              <span v-if="typeof n.score === 'number'">⭐ {{ n.score }}</span>
+            <p v-if="n.title && n.message" class="text-sm text-ink-500">{{ n.message }}</p>
+            <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-400">
+              <span v-if="n.store" class="inline-flex items-center gap-1.5">
+                <Icon name="store" :size="13" /> {{ n.store }}
+              </span>
+              <span v-if="price(n.price)" class="nums">{{ price(n.price) }}</span>
+              <span v-if="typeof n.score === 'number'" class="inline-flex items-center gap-1.5">
+                <Icon name="trending" :size="13" /> <span class="nums">{{ n.score }}</span>
+              </span>
             </div>
           </div>
         </li>

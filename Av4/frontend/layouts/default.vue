@@ -22,36 +22,47 @@ onMounted(async () => {
   <div class="min-h-screen lg:flex">
     <!-- Sidebar -->
     <aside
-      class="fixed inset-y-0 left-0 z-40 w-72 transform border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0"
+      class="fixed inset-y-0 left-0 z-40 w-72 transform border-r border-bone-200 bg-bone-50/80 backdrop-blur-md transition-transform duration-300 lg:static lg:translate-x-0"
       :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'"
     >
-      <div class="flex h-full flex-col p-4">
-        <div class="mb-6 flex items-center gap-2 px-2">
-          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-lg text-white shadow-sm">
-            🏷️
+      <div class="flex h-full flex-col p-5">
+        <!-- Wordmark -->
+        <NuxtLink to="/" class="mb-8 flex items-center gap-3 px-1" @click="mobileOpen = false">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-pine-800 text-acid-300 shadow-card">
+            <Icon name="tag" :size="20" :stroke-width="2" />
           </div>
           <div>
-            <p class="text-sm font-bold leading-tight text-slate-900">Promoções</p>
-            <p class="text-xs text-slate-400">Plataforma EDA</p>
+            <p class="font-display text-lg font-extrabold leading-none tracking-tightest text-ink-900">
+              Mercado
+            </p>
+            <p class="mt-1 text-[0.7rem] font-medium uppercase tracking-[0.16em] text-ink-400">
+              Promoções ao vivo
+            </p>
           </div>
-        </div>
+        </NuxtLink>
 
         <NavBar @click="mobileOpen = false" />
 
         <div class="mt-auto space-y-3 pt-6">
           <ConsumerSelector />
-          <div class="flex items-center gap-2 px-1 text-xs">
-            <span
-              class="h-2 w-2 rounded-full"
-              :class="gatewayOnline === null
-                ? 'bg-slate-300'
-                : gatewayOnline
-                  ? 'bg-emerald-500'
-                  : 'bg-rose-500'"
-            />
-            <span class="text-slate-400">
-              Gateway
-              <template v-if="gatewayOnline === null">…</template>
+          <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs">
+            <span class="relative flex h-2 w-2">
+              <span
+                v-if="gatewayOnline"
+                class="absolute inline-flex h-full w-full animate-ping rounded-full bg-pine-400 opacity-60"
+              />
+              <span
+                class="relative inline-flex h-2 w-2 rounded-full"
+                :class="gatewayOnline === null
+                  ? 'bg-bone-400'
+                  : gatewayOnline
+                    ? 'bg-pine-500'
+                    : 'bg-rose-500'"
+              />
+            </span>
+            <span class="font-medium text-ink-500">Gateway</span>
+            <span class="ml-auto nums text-ink-400">
+              <template v-if="gatewayOnline === null">—</template>
               <template v-else>{{ gatewayOnline ? 'online' : 'offline' }}</template>
             </span>
           </div>
@@ -61,24 +72,26 @@ onMounted(async () => {
 
     <div
       v-if="mobileOpen"
-      class="fixed inset-0 z-30 bg-slate-900/30 lg:hidden"
+      class="fixed inset-0 z-30 bg-pine-950/40 backdrop-blur-sm lg:hidden"
       @click="mobileOpen = false"
     />
 
     <!-- Main -->
     <div class="flex min-w-0 flex-1 flex-col">
-      <header class="flex items-center gap-3 border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur lg:hidden">
-        <button class="btn-ghost btn-sm" @click="mobileOpen = !mobileOpen">☰</button>
-        <span class="font-semibold text-slate-800">Promoções</span>
-        <span class="ml-auto badge bg-slate-100 text-slate-500">{{ user.consumerId }}</span>
+      <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-bone-200 bg-bone-100/80 px-4 py-3 backdrop-blur-md lg:hidden">
+        <button class="btn-ghost btn-sm" aria-label="Abrir menu" @click="mobileOpen = !mobileOpen">
+          <Icon name="menu" :size="18" />
+        </button>
+        <span class="font-display font-bold tracking-tight text-ink-900">Mercado</span>
+        <span class="badge nums ml-auto bg-bone-200 text-ink-500">{{ user.consumerId }}</span>
       </header>
 
-      <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+      <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-8">
         <slot />
       </main>
 
-      <footer class="border-t border-slate-200 px-4 py-4 text-center text-xs text-slate-400">
-        Av4 — Plataforma Distribuída de Promoções · Frontend Nuxt 3
+      <footer class="border-t border-bone-200 px-4 py-5 text-center text-xs text-ink-400">
+        Mercado — Plataforma Distribuída de Promoções · Arquitetura Orientada a Eventos
       </footer>
     </div>
   </div>

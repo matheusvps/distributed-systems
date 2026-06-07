@@ -10,10 +10,12 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: 'Promoções',
+      title: 'Mercado · Plataforma de Promoções',
       meta: [
         { charset: 'utf-8' },
-        { name: 'viewport', content: 'width=device-width, initial-scale=1' }
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'theme-color', content: '#153f2b' },
+        { name: 'description', content: 'Plataforma distribuída de promoções em tempo real.' }
       ]
     }
   }

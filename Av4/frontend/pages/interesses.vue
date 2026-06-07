@@ -44,17 +44,18 @@ async function toggle(category: string) {
 <template>
   <div class="mx-auto max-w-3xl">
     <PageHeader
+      eyebrow="Preferências"
       title="Meus interesses"
-      :subtitle="`Categorias seguidas por ${user.consumerId} — você recebe notificações ao vivo delas`"
+      :subtitle="`Categorias seguidas por ${user.consumerId} — você recebe notificações ao vivo delas.`"
     >
       <template #actions>
-        <span class="badge bg-brand-50 text-brand-700">
-          {{ interesses.interests.length }} seguindo
+        <span class="badge bg-pine-50 text-pine-700 ring-1 ring-inset ring-pine-100">
+          <span class="nums">{{ interesses.interests.length }}</span> seguindo
         </span>
       </template>
     </PageHeader>
 
-    <div v-if="interesses.loading" class="card p-6 text-sm text-slate-400">Carregando…</div>
+    <div v-if="interesses.loading" class="card p-6 text-sm text-ink-400">Carregando…</div>
 
     <EmptyState
       v-else-if="!promos.categories.length"
@@ -67,17 +68,18 @@ async function toggle(category: string) {
         v-for="c in promos.categories"
         :key="c"
         class="card flex items-center justify-between gap-3 p-4"
+        :class="interesses.isFollowing(c) ? 'border-pine-200 bg-pine-50/40' : ''"
       >
         <div class="flex items-center gap-3">
           <div
-            class="flex h-10 w-10 items-center justify-center rounded-xl text-lg"
-            :class="interesses.isFollowing(c) ? 'bg-brand-50' : 'bg-slate-100'"
+            class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors"
+            :class="interesses.isFollowing(c) ? 'bg-pine-800 text-acid-300' : 'bg-bone-200 text-ink-500'"
           >
-            {{ interesses.isFollowing(c) ? '⭐' : '🏷️' }}
+            <Icon :name="interesses.isFollowing(c) ? 'bookmark' : 'tag'" :size="20" />
           </div>
           <div>
-            <p class="text-sm font-semibold capitalize text-slate-800">{{ c }}</p>
-            <p class="text-xs text-slate-400">
+            <p class="font-display text-sm font-bold capitalize text-ink-900">{{ c }}</p>
+            <p class="text-xs text-ink-400">
               {{ interesses.isFollowing(c) ? 'Seguindo' : 'Não seguindo' }}
             </p>
           </div>

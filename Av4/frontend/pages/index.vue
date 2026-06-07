@@ -23,7 +23,7 @@ async function onVote(id: string, vote: 1 | -1) {
   votingId.value = id
   try {
     await store.vote(id, vote, user.consumerId)
-    toast.success(vote === 1 ? 'Voto positivo registrado 👍' : 'Voto negativo registrado 👎')
+    toast.success(vote === 1 ? 'Voto positivo registrado' : 'Voto negativo registrado')
   } catch (e: any) {
     toast.error(e?.data?.message || e?.message || 'Não foi possível votar')
   } finally {
@@ -34,16 +34,22 @@ async function onVote(id: string, vote: 1 | -1) {
 
 <template>
   <div>
-    <PageHeader title="Promoções" subtitle="Descubra e vote nas melhores ofertas">
+    <PageHeader
+      eyebrow="Catálogo"
+      title="Promoções"
+      subtitle="Descubra as melhores ofertas e ajude a impulsionar as que valem a pena com seu voto."
+    >
       <template #actions>
         <button class="btn-ghost btn-sm" :disabled="store.loading" @click="load">
-          ↻ Atualizar
+          <Icon name="refresh" :size="15" :class="store.loading ? 'animate-spin' : ''" /> Atualizar
         </button>
-        <NuxtLink to="/cadastro" class="btn-primary btn-sm">➕ Nova promoção</NuxtLink>
+        <NuxtLink to="/cadastro" class="btn-accent btn-sm">
+          <Icon name="plus" :size="15" :stroke-width="2.25" /> Nova promoção
+        </NuxtLink>
       </template>
     </PageHeader>
 
-    <div class="mb-6">
+    <div class="mb-7">
       <CategoryFilter
         v-model="store.selectedCategory"
         :categories="store.categories"
@@ -56,7 +62,7 @@ async function onVote(id: string, vote: 1 | -1) {
 
     <EmptyState
       v-else-if="store.error"
-      icon="⚠️"
+      icon="alert"
       title="Erro ao carregar"
       :subtitle="store.error"
     >
