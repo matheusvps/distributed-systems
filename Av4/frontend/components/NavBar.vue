@@ -1,18 +1,24 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useNotificacoesStore } from '~/stores/notificacoes'
+import { useUserStore } from '~/stores/user'
 import { useNotificationPanel } from '~/composables/useNotificationPanel'
 
 const notif = useNotificacoesStore()
+const user = useUserStore()
 const { open, toggle } = useNotificationPanel()
 const badge = computed(() => notif.unread)
 
-const links = [
+const clienteLinks = [
   { to: '/', label: 'Promoções', icon: 'tag' },
   { to: '/hot-deals', label: 'Hot Deals', icon: 'flame' },
-  { to: '/cadastro', label: 'Cadastrar', icon: 'plus' },
   { to: '/interesses', label: 'Interesses', icon: 'bookmark' }
 ]
+const lojaLinks = [
+  { to: '/loja', label: 'Minhas promoções', icon: 'trending' },
+  { to: '/cadastro', label: 'Cadastrar', icon: 'plus' }
+]
+const links = computed(() => (user.role === 'loja' ? lojaLinks : clienteLinks))
 </script>
 
 <template>
@@ -28,8 +34,9 @@ const links = [
       <span class="flex-1">{{ l.label }}</span>
     </NuxtLink>
 
-    <!-- Notificações: toggle do painel, não é uma rota -->
+    <!-- Notificações: só para cliente; é toggle do painel, não uma rota -->
     <button
+      v-if="user.role === 'cliente'"
       type="button"
       class="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
       :class="open

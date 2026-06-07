@@ -43,9 +43,6 @@ async function onVote(id: string, vote: 1 | -1) {
         <button class="btn-ghost btn-sm" :disabled="store.loading" @click="load">
           <Icon name="refresh" :size="15" :class="store.loading ? 'animate-spin' : ''" /> Atualizar
         </button>
-        <NuxtLink to="/cadastro" class="btn-accent btn-sm">
-          <Icon name="plus" :size="15" :stroke-width="2.25" /> Nova promoção
-        </NuxtLink>
       </template>
     </PageHeader>
 

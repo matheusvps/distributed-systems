@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { reactive, ref, computed, onMounted } from 'vue'
 import { usePromocoesStore } from '~/stores/promocoes'
+import { useUserStore } from '~/stores/user'
+import { useMinhasStore } from '~/stores/minhas'
 import { useToast } from '~/composables/useToast'
 
 const store = usePromocoesStore()
+const user = useUserStore()
+const minhas = useMinhasStore()
 const toast = useToast()
 
 const form = reactive({
@@ -11,15 +15,12 @@ const form = reactive({
   description: '',
   category: '',
   price: '' as string | number,
-  originalPrice: '' as string | number,
-  store: '',
-  storeEmail: ''
+  originalPrice: '' as string | number
 })
 
 const submitting = ref(false)
 const touched = ref(false)
 
-const emailValid = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.storeEmail.trim()))
 const priceNum = computed(() => Number(form.price))
 const origNum = computed(() => Number(form.originalPrice))
 
@@ -28,8 +29,6 @@ const errors = computed(() => {
   if (!form.title.trim()) e.title = 'Informe o título'
   if (!form.description.trim()) e.description = 'Informe a descrição'
   if (!form.category.trim()) e.category = 'Selecione a categoria'
-  if (!form.store.trim()) e.store = 'Informe a loja'
-  if (!emailValid.value) e.storeEmail = 'E-mail inválido'
   if (form.price === '' || isNaN(priceNum.value) || priceNum.value < 0) e.price = 'Preço inválido'
   if (form.originalPrice === '' || isNaN(origNum.value) || origNum.value < 0)
     e.originalPrice = 'Preço original inválido'
@@ -51,26 +50,32 @@ async function submit() {
   }
   submitting.value = true
   try {
-    const res = await store.createPromotion({
+    const payload = {
       title: form.title.trim(),
       description: form.description.trim(),
       category: form.category.trim(),
       price: priceNum.value,
       originalPrice: origNum.value,
-      store: form.store.trim(),
-      storeEmail: form.storeEmail.trim()
-    })
-    toast.success(`Promoção enviada! ${res?.promotionId ? `(id: ${res.promotionId})` : ''}`)
-    Object.assign(form, {
-      title: '',
-      description: '',
-      category: '',
-      price: '',
-      originalPrice: '',
-      store: '',
-      storeEmail: ''
-    })
+      store: user.loja.name,
+      storeEmail: user.loja.email
+    }
+    const res = await store.createPromotion(payload)
+    if (res?.promotionId) {
+      minhas.add({
+        id: res.promotionId,
+        title: payload.title,
+        category: payload.category,
+        price: payload.price,
+        originalPrice: payload.originalPrice,
+        store: payload.store,
+        storeEmail: payload.storeEmail,
+        submittedAt: new Date().toISOString()
+      })
+    }
+    toast.success('Promoção enviada! Acompanhe o status em Minhas promoções.')
+    Object.assign(form, { title: '', description: '', category: '', price: '', originalPrice: '' })
     touched.value = false
+    await navigateTo('/loja')
   } catch (e: any) {
     toast.error(e?.data?.message || e?.message || 'Falha ao cadastrar promoção')
   } finally {
@@ -86,6 +91,20 @@ async function submit() {
       title="Cadastrar promoção"
       subtitle="Publique uma oferta da sua loja. Ela será validada antes de entrar no catálogo."
     />
+
+    <!-- Publicando como (perfil da loja) -->
+    <div class="card mb-5 flex items-center gap-3 p-4">
+      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pine-800 text-acid-300">
+        <Icon name="store" :size="20" />
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Publicando como</p>
+        <p class="truncate font-semibold text-ink-900">
+          {{ user.loja.name }}
+          <span class="font-normal text-ink-400">· {{ user.loja.email }}</span>
+        </p>
+      </div>
+    </div>
 
     <form class="card space-y-5 p-6" novalidate @submit.prevent="submit">
       <div>
@@ -107,29 +126,20 @@ async function submit() {
         </p>
       </div>
 
-      <div class="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label class="label">Categoria</label>
-          <input
-            v-model="form.category"
-            class="input"
-            list="categorias"
-            placeholder="eletronicos"
-          />
-          <datalist id="categorias">
-            <option v-for="c in store.categories" :key="c" :value="c" />
-          </datalist>
-          <p v-if="touched && errors.category" class="mt-1 text-xs text-rose-600">
-            {{ errors.category }}
-          </p>
-        </div>
-        <div>
-          <label class="label">Loja</label>
-          <input v-model="form.store" class="input" placeholder="Minha Loja" />
-          <p v-if="touched && errors.store" class="mt-1 text-xs text-rose-600">
-            {{ errors.store }}
-          </p>
-        </div>
+      <div>
+        <label class="label">Categoria</label>
+        <input
+          v-model="form.category"
+          class="input"
+          list="categorias"
+          placeholder="eletronicos"
+        />
+        <datalist id="categorias">
+          <option v-for="c in store.categories" :key="c" :value="c" />
+        </datalist>
+        <p v-if="touched && errors.category" class="mt-1 text-xs text-rose-600">
+          {{ errors.category }}
+        </p>
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">
@@ -140,7 +150,7 @@ async function submit() {
             type="number"
             step="0.01"
             min="0"
-            class="input"
+            class="input nums"
             placeholder="999.90"
           />
           <p v-if="touched && errors.price" class="mt-1 text-xs text-rose-600">
@@ -154,26 +164,13 @@ async function submit() {
             type="number"
             step="0.01"
             min="0"
-            class="input"
+            class="input nums"
             placeholder="1299.90"
           />
           <p v-if="touched && errors.originalPrice" class="mt-1 text-xs text-rose-600">
             {{ errors.originalPrice }}
           </p>
         </div>
-      </div>
-
-      <div>
-        <label class="label">E-mail da loja</label>
-        <input
-          v-model="form.storeEmail"
-          type="email"
-          class="input"
-          placeholder="contato@loja.com"
-        />
-        <p v-if="touched && errors.storeEmail" class="mt-1 text-xs text-rose-600">
-          {{ errors.storeEmail }}
-        </p>
       </div>
 
       <div class="flex flex-wrap items-center justify-end gap-3 border-t border-bone-200 pt-5">

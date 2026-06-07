@@ -26,7 +26,11 @@ const paths: Record<string, string> = {
   down: 'M18 10h-3V4H9v9l-3 1 4 7c1.2 0 2-.6 2.5-2L15 15h3a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2Z',
   menu: 'M4 7h16M4 12h16M4 17h16',
   spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18',
-  trending: 'M4 16l5-5 3 3 7-7M15 7h5v5'
+  trending: 'M4 16l5-5 3 3 7-7M15 7h5v5',
+  user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 20a7.5 7.5 0 0 1 15 0',
+  logout: 'M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2M10 12h11M21 12l-3-3M21 12l-3 3',
+  arrowRight: 'M5 12h14M13 6l6 6-6 6',
+  clock: 'M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z'
 }
 
 const isFilledDot = (n: string) => n === 'check' || n === 'close' || n === 'menu'

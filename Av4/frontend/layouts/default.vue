@@ -12,8 +12,9 @@ const unread = computed(() => notif.unread)
 const mobileOpen = ref(false)
 const gatewayOnline = ref<boolean | null>(null)
 
+const roleLabel = computed(() => (user.role === 'loja' ? 'Painel da loja' : 'Conta cliente'))
+
 onMounted(async () => {
-  user.hydrate()
   try {
     await useApiService().health()
     gatewayOnline.value = true
@@ -21,6 +22,11 @@ onMounted(async () => {
     gatewayOnline.value = false
   }
 })
+
+function trocarPerfil() {
+  mobileOpen.value = false
+  user.exit()
+}
 </script>
 
 <template>
@@ -32,7 +38,7 @@ onMounted(async () => {
     >
       <div class="flex h-full flex-col p-5">
         <!-- Wordmark -->
-        <NuxtLink to="/" class="mb-8 flex items-center gap-3 px-1" @click="mobileOpen = false">
+        <NuxtLink :to="user.homePath" class="mb-7 flex items-center gap-3 px-1" @click="mobileOpen = false">
           <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-pine-800 text-acid-300 shadow-card">
             <Icon name="tag" :size="20" :stroke-width="2" />
           </div>
@@ -41,7 +47,7 @@ onMounted(async () => {
               Mercado
             </p>
             <p class="mt-1 text-[0.7rem] font-medium uppercase tracking-[0.16em] text-ink-400">
-              Promoções ao vivo
+              {{ roleLabel }}
             </p>
           </div>
         </NuxtLink>
@@ -49,7 +55,17 @@ onMounted(async () => {
         <NavBar @click="mobileOpen = false" />
 
         <div class="mt-auto space-y-3 pt-6">
-          <ConsumerSelector />
+          <ConsumerSelector v-if="user.role === 'cliente'" />
+          <LojaProfileCard v-else-if="user.role === 'loja'" />
+
+          <button
+            class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-ink-500 transition hover:bg-bone-200/70 hover:text-ink-900"
+            @click="trocarPerfil"
+          >
+            <Icon name="logout" :size="17" />
+            Trocar perfil
+          </button>
+
           <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs">
             <span class="relative flex h-2 w-2">
               <span
@@ -89,6 +105,7 @@ onMounted(async () => {
         </button>
         <span class="font-display font-bold tracking-tight text-ink-900">Mercado</span>
         <button
+          v-if="user.role === 'cliente'"
           class="relative ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-ink-700 transition hover:bg-bone-200"
           aria-label="Notificações"
           @click="toggleNotif"
@@ -112,7 +129,7 @@ onMounted(async () => {
       </footer>
     </div>
 
-    <!-- Painel de notificações global (hospeda a conexão SSE) -->
-    <NotificationMenu />
+    <!-- Painel de notificações (só cliente; hospeda a conexão SSE) -->
+    <NotificationMenu v-if="user.role === 'cliente'" />
   </div>
 </template>
