@@ -58,6 +58,7 @@ export interface NotificationEvent {
 export interface FeedNotification extends NotificationEvent {
   receivedAt: string
   localId: string
+  read: boolean
 }
 
 export type SseStatus = 'idle' | 'connecting' | 'open' | 'error' | 'closed'

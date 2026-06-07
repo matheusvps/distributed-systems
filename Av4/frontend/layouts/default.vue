@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useUserStore } from '~/stores/user'
 import { useApiService } from '~/services/api'
+import { useNotificacoesStore } from '~/stores/notificacoes'
+import { useNotificationPanel } from '~/composables/useNotificationPanel'
 
 const user = useUserStore()
+const notif = useNotificacoesStore()
+const { toggle: toggleNotif } = useNotificationPanel()
+const unread = computed(() => notif.unread)
 const mobileOpen = ref(false)
 const gatewayOnline = ref<boolean | null>(null)
 
@@ -83,7 +88,19 @@ onMounted(async () => {
           <Icon name="menu" :size="18" />
         </button>
         <span class="font-display font-bold tracking-tight text-ink-900">Mercado</span>
-        <span class="badge nums ml-auto bg-bone-200 text-ink-500">{{ user.consumerId }}</span>
+        <button
+          class="relative ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-ink-700 transition hover:bg-bone-200"
+          aria-label="Notificações"
+          @click="toggleNotif"
+        >
+          <Icon name="bell" :size="18" />
+          <span
+            v-if="unread > 0"
+            class="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-acid-400 px-1 text-[0.6rem] font-bold text-pine-900"
+          >
+            {{ unread > 9 ? '9+' : unread }}
+          </span>
+        </button>
       </header>
 
       <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-8">
@@ -94,5 +111,8 @@ onMounted(async () => {
         Mercado — Plataforma Distribuída de Promoções · Arquitetura Orientada a Eventos
       </footer>
     </div>
+
+    <!-- Painel de notificações global (hospeda a conexão SSE) -->
+    <NotificationMenu />
   </div>
 </template>
