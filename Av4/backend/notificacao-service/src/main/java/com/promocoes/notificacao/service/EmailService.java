@@ -1,23 +1,20 @@
 package com.promocoes.notificacao.service;
 
+import com.resend.Resend;
+import com.resend.core.exception.ResendException;
+import com.resend.services.emails.model.CreateEmailOptions;
+import com.resend.services.emails.model.CreateEmailResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-
 /**
- * Servico de envio de e-mail via Resend HTTP API.
+ * Servico de envio de e-mail via Resend (SDK oficial resend-java).
  * Se o provider nao for "resend" ou o api-key estiver em branco, apenas loga (modo mock).
  */
 @Slf4j
 @Service
 public class EmailService {
-
-    private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
     @Value("${promocoes.email.provider:resend}")
     private String provider;
@@ -25,10 +22,8 @@ public class EmailService {
     @Value("${promocoes.email.api-key:}")
     private String apiKey;
 
-    @Value("${promocoes.email.from:Promocoes <onboarding@resend.dev>}")
+    @Value("${promocoes.email.from:MS Notificacao <onboarding@resend.dev>}")
     private String from;
-
-    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     /**
      * Envia um e-mail. Nunca lanca excecao — erros sao capturados e logados.
@@ -47,46 +42,24 @@ public class EmailService {
         try {
             String safeHtml = html != null ? html : text;
             String safeText = text != null ? text : "";
-            String safeFrom = from != null ? from : "Promocoes <onboarding@resend.dev>";
+            String safeFrom = from != null ? from : "MS Notificacao <onboarding@resend.dev>";
 
-            String jsonBody = String.format(
-                    "{\"from\":\"%s\",\"to\":[\"%s\"],\"subject\":\"%s\",\"html\":\"%s\",\"text\":\"%s\"}",
-                    escape(safeFrom),
-                    escape(to),
-                    escape(subject),
-                    escape(safeHtml),
-                    escape(safeText)
-            );
+            Resend resend = new Resend(apiKey);
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(RESEND_API_URL))
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + apiKey)
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+            CreateEmailOptions params = CreateEmailOptions.builder()
+                    .from(safeFrom)
+                    .to(to)
+                    .subject(subject)
+                    .html(safeHtml)
+                    .text(safeText)
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                log.info("[EMAIL] Enviado com sucesso para {} | subject={} | response={}", to, subject, response.body());
-            } else {
-                log.warn("[EMAIL] Falha ao enviar para {} | status={} | response={}", to, response.statusCode(), response.body());
-            }
+            CreateEmailResponse response = resend.emails().send(params);
+            log.info("[EMAIL] Enviado com sucesso para {} | subject={} | id={}", to, subject, response.getId());
+        } catch (ResendException e) {
+            log.warn("[EMAIL] Falha ao enviar para {} | subject={} | erro={}", to, subject, e.getMessage());
         } catch (Exception e) {
-            log.warn("[EMAIL] Erro ao enviar e-mail para {} | subject={} | erro={}", to, subject, e.getMessage());
+            log.warn("[EMAIL] Erro inesperado ao enviar e-mail para {} | subject={} | erro={}", to, subject, e.getMessage());
         }
-    }
-
-    /** Escapa caracteres especiais JSON de forma simples. */
-    private String escape(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
     }
 }

@@ -142,7 +142,7 @@ services:
       DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-resend}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      EMAIL_FROM: ${EMAIL_FROM:-Promocoes <onboarding@resend.dev>}
+      EMAIL_FROM: ${EMAIL_FROM:-MS Notificacao <onboarding@resend.dev>}
       KEYS_DIR: /keys
     volumes:
       - keys:/keys:ro

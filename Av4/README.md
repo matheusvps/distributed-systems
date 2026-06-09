@@ -138,7 +138,7 @@ Teste rápido: `curl -N "http://localhost:8080/api/notificacoes/stream?consumerI
 | `KEYS_DIR` | `../../keys` (local) / `/keys` (docker) | diretório das chaves RSA |
 | `EMAIL_PROVIDER` | `resend` | `resend` (real) ou qualquer outro = mock |
 | `RESEND_API_KEY` | _(vazio)_ | chave Resend; sem ela → mock (loga) |
-| `EMAIL_FROM` | `Promocoes <onboarding@resend.dev>` | remetente |
+| `EMAIL_FROM` | `MS Notificacao <onboarding@resend.dev>` | remetente |
 | `NUXT_PUBLIC_GATEWAY_URL` | `http://localhost:8080` | URL do Gateway no frontend |
 
 ## Modelo de eventos e exemplos

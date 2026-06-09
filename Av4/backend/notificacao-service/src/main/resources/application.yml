@@ -27,7 +27,7 @@ promocoes:
   email:
     provider: ${EMAIL_PROVIDER:resend}
     api-key: ${RESEND_API_KEY:}
-    from: ${EMAIL_FROM:Promocoes <onboarding@resend.dev>}
+    from: ${EMAIL_FROM:-MS Notificacao <onboarding@resend.dev>}
 
 logging:
   level:
