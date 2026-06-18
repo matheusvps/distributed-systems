@@ -133,6 +133,10 @@ services:
       rabbitmq: { condition: service_healthy }
       postgres: { condition: service_healthy }
       keygen: { condition: service_completed_successfully }
+    # Carrega o .env da raiz do projeto independentemente do diretorio onde o
+    # compose e executado (EMAIL_PROVIDER, RESEND_API_KEY, EMAIL_FROM).
+    env_file:
+      - ../.env
     environment:
       RABBITMQ_HOST: rabbitmq
       DB_URL: jdbc:postgresql://postgres:5432/notificacao_db
@@ -140,9 +144,6 @@ services:
       DB_PASS: promo
       DB_DRIVER: org.postgresql.Driver
       DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
-      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-resend}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      EMAIL_FROM: ${EMAIL_FROM:-MS Notificacao <onboarding@resend.dev>}
       KEYS_DIR: /keys
     volumes:
       - keys:/keys:ro

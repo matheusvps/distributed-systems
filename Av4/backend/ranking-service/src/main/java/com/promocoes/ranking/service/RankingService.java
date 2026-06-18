@@ -2,6 +2,7 @@ package com.promocoes.ranking.service;
 
 import com.promocoes.ranking.domain.Score;
 import com.promocoes.ranking.dto.DestaquePayload;
+import com.promocoes.ranking.dto.ScorePayload;
 import com.promocoes.ranking.dto.VotoPayload;
 import com.promocoes.ranking.repository.ScoreRepository;
 import com.promocoes.shared.event.EventType;
@@ -56,6 +57,20 @@ public class RankingService {
         log.info("Voto processado para promocao {}: score={}, +{}/-{}",
                 score.getPromotionId(), score.getScore(),
                 score.getPositiveVotes(), score.getNegativeVotes());
+
+        publisher.publish(
+                Exchanges.EVENTS,
+                RoutingKeys.PROMOCAO_SCORE,
+                EventType.PROMOCAO_SCORE,
+                SOURCE,
+                ScorePayload.builder()
+                        .promotionId(score.getPromotionId())
+                        .score(score.getScore())
+                        .positiveVotes(score.getPositiveVotes())
+                        .negativeVotes(score.getNegativeVotes())
+                        .updatedAt(Instant.now())
+                        .build()
+        );
 
         if (score.getScore() >= hotDealThreshold && !score.isHotPublished()) {
             score.setHotPublished(true);

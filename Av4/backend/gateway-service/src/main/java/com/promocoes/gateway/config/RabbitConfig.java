@@ -29,6 +29,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Binding gatewayScoreBinding(Queue gatewayEventsQueue, TopicExchange eventsExchange) {
+        return BindingBuilder.bind(gatewayEventsQueue).to(eventsExchange).with(RoutingKeys.PROMOCAO_SCORE);
+    }
+
+    @Bean
     public Queue gatewayNotifQueue() {
         return QueueBuilder.durable(Queues.GATEWAY_NOTIF).build();
     }

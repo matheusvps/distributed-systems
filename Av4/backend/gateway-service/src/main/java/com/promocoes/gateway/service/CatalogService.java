@@ -48,10 +48,22 @@ public class CatalogService {
                 .status(payload.getStatus() != null ? payload.getStatus() : "publicada")
                 .validatedAt(payload.getValidatedAt())
                 .hot(existing != null && existing.isHot())
-                .score(existing != null ? existing.getScore() : null)
+                .score(existing != null && existing.getScore() != null ? existing.getScore() : 0)
                 .build();
         repository.save(entity);
         log.info("Catalogo atualizado (upsert): {} - {}", entity.getId(), entity.getTitle());
+    }
+
+    public void updateScore(String id, Integer score) {
+        if (id == null) {
+            log.warn("Catalogo: score ignorado, promotionId ausente no evento.");
+            return;
+        }
+        repository.findById(id).ifPresentOrElse(item -> {
+            item.setScore(score);
+            repository.save(item);
+            log.info("Catalogo: score da promocao {} atualizado para {}.", id, score);
+        }, () -> log.warn("Catalogo: score ignorado, promocao {} nao encontrada.", id));
     }
 
     public void markHot(String id, Integer score) {

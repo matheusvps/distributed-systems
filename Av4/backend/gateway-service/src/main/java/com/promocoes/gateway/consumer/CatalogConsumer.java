@@ -33,6 +33,12 @@ public class CatalogConsumer {
         if (EventType.PROMOCAO_PUBLICADA.equals(event.getType())) {
             PromocaoPayload payload = objectMapper.convertValue(event.getPayload(), PromocaoPayload.class);
             catalogService.upsert(payload);
+        } else if (EventType.PROMOCAO_SCORE.equals(event.getType())) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> p = objectMapper.convertValue(event.getPayload(), Map.class);
+            String promotionId = p.get("promotionId") != null ? String.valueOf(p.get("promotionId")) : null;
+            Integer score = p.get("score") != null ? ((Number) p.get("score")).intValue() : null;
+            catalogService.updateScore(promotionId, score);
         } else if (EventType.PROMOCAO_DESTAQUE.equals(event.getType())) {
             @SuppressWarnings("unchecked")
             Map<String, Object> p = objectMapper.convertValue(event.getPayload(), Map.class);

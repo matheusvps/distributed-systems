@@ -49,8 +49,8 @@ export const usePromocoesStore = defineStore('promocoes', {
     async vote(promotionId: string, vote: 1 | -1, consumerId: string) {
       const api = useApiService()
       const promo = this.items.find((p) => p.id === promotionId)
-      if (promo && typeof promo.score === 'number') {
-        promo.score += vote
+      if (promo) {
+        promo.score = (typeof promo.score === 'number' ? promo.score : 0) + vote
       }
       await api.vote(promotionId, { vote, consumerId })
     }
