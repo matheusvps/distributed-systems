@@ -4,9 +4,6 @@ import lombok.Data;
 
 import java.time.Instant;
 
-/**
- * Payload do evento promocao.voto.
- */
 @Data
 public class VotoPayload {
 

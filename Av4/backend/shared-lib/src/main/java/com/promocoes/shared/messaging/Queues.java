@@ -1,9 +1,5 @@
 package com.promocoes.shared.messaging;
 
-/**
- * Nomes das filas por microsservico. O Gateway possui duas filas:
- * uma para eventos de dominio (catalogo) e outra para notificacoes (SSE).
- */
 public final class Queues {
 
     public static final String GATEWAY_EVENTS = "fila.gateway.events";

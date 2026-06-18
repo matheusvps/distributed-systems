@@ -5,9 +5,6 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
-/**
- * Payload da notificacao publicada no exchange NOTIFICATIONS (routing key promocao.categoria.<cat>).
- */
 @Data
 @Builder
 public class NotificacaoPayload {

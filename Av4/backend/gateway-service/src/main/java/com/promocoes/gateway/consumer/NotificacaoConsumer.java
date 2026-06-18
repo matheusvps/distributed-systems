@@ -16,10 +16,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Consome promocao.categoria.# (exchange de notificacoes), descobre os consumidores
- * interessados na categoria e entrega a notificacao via SSE.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -34,7 +30,7 @@ public class NotificacaoConsumer {
     @RabbitListener(queues = Queues.GATEWAY_NOTIF)
     public void onNotificacao(EventEnvelope event) {
         if (!eventVerifier.isValid(event)) {
-            return; // assinatura invalida ja logada
+            return;
         }
 
         Map<String, Object> payload = objectMapper.convertValue(event.getPayload(), Map.class);
@@ -45,7 +41,6 @@ public class NotificacaoConsumer {
             return;
         }
 
-        // Repassa os campos "flat" publicados pelo MS Notificacao para o frontend.
         Notificacao notificacao = Notificacao.builder()
                 .type(type)
                 .category(category)

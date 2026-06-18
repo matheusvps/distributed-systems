@@ -116,7 +116,6 @@ onMounted(load)
       </template>
     </PageHeader>
 
-    <!-- Resumo -->
     <div class="mb-6 grid grid-cols-3 gap-3">
       <div class="card p-4">
         <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Total</p>

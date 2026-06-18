@@ -40,7 +40,6 @@ async function entrarLoja() {
 
 <template>
   <div class="relative min-h-screen overflow-hidden">
-    <!-- Marca decorativa em watermark -->
     <p
       class="pointer-events-none absolute -bottom-20 -right-10 select-none font-display text-[18rem] font-extrabold leading-none tracking-tightest text-pine-900/[0.03]"
     >
@@ -67,7 +66,6 @@ async function entrarLoja() {
       </header>
 
       <div class="grid gap-5 md:grid-cols-2">
-        <!-- Cliente -->
         <section
           class="card flex flex-col p-6 animate-rise-in"
           style="animation-delay: 80ms"
@@ -108,7 +106,6 @@ async function entrarLoja() {
           </button>
         </section>
 
-        <!-- Loja -->
         <section
           class="card relative flex flex-col overflow-hidden p-6 ring-1 ring-acid-200 animate-rise-in"
           style="animation-delay: 160ms"

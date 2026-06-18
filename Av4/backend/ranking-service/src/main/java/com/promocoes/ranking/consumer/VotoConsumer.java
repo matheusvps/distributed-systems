@@ -11,9 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Consome promocao.voto: valida assinatura, processa voto e publica destaque se hot deal.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -26,7 +23,7 @@ public class VotoConsumer {
     @RabbitListener(queues = Queues.RANKING)
     public void onVoto(EventEnvelope event) {
         if (!eventVerifier.isValid(event)) {
-            return; // assinatura invalida ja logada
+            return;
         }
         log.info("Evento {} aceito (assinatura OK, source={}).", event.getType(), event.getSource());
 

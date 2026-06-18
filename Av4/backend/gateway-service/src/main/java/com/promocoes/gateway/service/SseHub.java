@@ -16,22 +16,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Hub SSE em memoria: mantem os emitters abertos por consumidor e um ring buffer
- * por consumidor (ultimas ~100 notificacoes) para o fallback por polling.
- */
 @Slf4j
 @Service
 public class SseHub {
 
     private static final int BUFFER_SIZE = 100;
-    private static final long TIMEOUT = 0L; // sem timeout
+    private static final long TIMEOUT = 0L;
 
     private final Map<String, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
     private final Map<String, Deque<Notificacao>> buffers = new ConcurrentHashMap<>();
     private final AtomicLong seq = new AtomicLong(0);
 
-    /** Cria e registra um emitter para o consumidor. */
     public SseEmitter connect(String consumerId) {
         SseEmitter emitter = new SseEmitter(TIMEOUT);
         emitters.computeIfAbsent(consumerId, k -> new CopyOnWriteArrayList<>()).add(emitter);
@@ -59,7 +54,6 @@ public class SseHub {
         }
     }
 
-    /** Entrega a notificacao a um consumidor: bufferiza e envia a todos os emitters dele. */
     public Notificacao deliver(String consumerId, Notificacao notificacao) {
         notificacao.setSeq(seq.incrementAndGet());
 
@@ -84,7 +78,6 @@ public class SseHub {
         return notificacao;
     }
 
-    /** Notificacoes bufferizadas com seq > since. */
     public List<Notificacao> buffered(String consumerId, long since) {
         Deque<Notificacao> buffer = buffers.get(consumerId);
         List<Notificacao> result = new ArrayList<>();
@@ -100,7 +93,6 @@ public class SseHub {
         return result;
     }
 
-    /** Heartbeat para manter as conexoes vivas. */
     @Scheduled(fixedRate = 25000)
     public void heartbeat() {
         for (Map.Entry<String, List<SseEmitter>> entry : emitters.entrySet()) {

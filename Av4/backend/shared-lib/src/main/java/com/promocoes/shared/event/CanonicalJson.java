@@ -15,22 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Serializacao canonica (deterministica) usada como base da assinatura.
- *
- * Inclui todos os campos do envelope EXCETO {@code signature}. A canonicalizacao e feita
- * sobre uma arvore {@link JsonNode} normalizada para ser ROBUSTA ao round-trip
- * POJO -> wire -> Map dos consumidores:
- * <ul>
- *   <li>chaves de objeto ordenadas alfabeticamente (recursivo);</li>
- *   <li>numeros normalizados via {@link BigDecimal#stripTrailingZeros()} +
- *       {@code toPlainString()} (assim {@code 1499.90} == {@code 1499.9}, e {@code Double}
- *       vs {@code BigDecimal} produzem o mesmo texto);</li>
- *   <li>strings escapadas de forma consistente (datas ISO viram texto identico nos dois lados).</li>
- * </ul>
- * Garante que quem assina (com POJOs tipados) e quem verifica (com o payload como Map)
- * produzam exatamente os mesmos bytes.
- */
 public final class CanonicalJson {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
@@ -90,7 +74,6 @@ public final class CanonicalJson {
 
     private static void writeString(String value, StringBuilder sb) {
         try {
-            // Reaproveita o escaping JSON do Jackson (aspas incluidas).
             sb.append(MAPPER.writeValueAsString(value));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Falha ao escapar string canonica", e);

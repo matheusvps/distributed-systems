@@ -27,7 +27,6 @@ const discount = computed(() => {
     class="card group relative flex flex-col overflow-hidden p-5 hover:-translate-y-1 hover:border-pine-300 hover:shadow-cardhover"
     :class="promo.hot ? 'ring-1 ring-acid-300' : ''"
   >
-    <!-- Discount tab in the top-right corner -->
     <div
       v-if="discount"
       class="absolute right-0 top-0 flex flex-col items-center rounded-bl-2xl bg-pine-800 px-3 py-2 text-bone-50"

@@ -11,9 +11,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Interesse de um consumidor por uma categoria. O par (consumerId, category) e unico.
- */
 @Entity
 @Table(name = "interesses", uniqueConstraints = @UniqueConstraint(columnNames = {"consumerId", "category"}))
 @Data

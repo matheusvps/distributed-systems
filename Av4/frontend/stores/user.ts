@@ -8,10 +8,6 @@ const KEYS = {
   loja: 'promo.loja'
 }
 
-/**
- * Sessão da aplicação: o papel ativo (cliente ou loja) e a identidade de cada um.
- * Cliente é identificado por consumerId; loja por nome + e-mail (perfil salvo).
- */
 export const useUserStore = defineStore('user', {
   state: () => ({
     role: null as Role,
@@ -37,7 +33,6 @@ export const useUserStore = defineStore('user', {
           const parsed = JSON.parse(loja)
           if (parsed && typeof parsed === 'object') this.loja = { name: parsed.name || '', email: parsed.email || '' }
         } catch {
-          /* ignore corrupt value */
         }
       }
     },
@@ -66,7 +61,6 @@ export const useUserStore = defineStore('user', {
       this.role = 'loja'
       this.persist()
     },
-    /** Volta para a tela de entrada, preservando as identidades salvas. */
     exit() {
       this.role = null
       this.persist()

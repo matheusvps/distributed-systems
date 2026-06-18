@@ -13,9 +13,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-/**
- * Log de notificacoes enviadas pelo MS Notificacao.
- */
 @Entity
 @Table(name = "notificacoes")
 @Data

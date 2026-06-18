@@ -12,9 +12,6 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Promocao validada e persistida pelo MS Promocao.
- */
 @Entity
 @Table(name = "promocoes")
 @Data

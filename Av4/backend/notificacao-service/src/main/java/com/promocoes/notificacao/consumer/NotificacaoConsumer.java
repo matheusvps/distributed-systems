@@ -13,9 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Consome a fila notificacao: trata promocao.publicada e promocao.destaque.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -28,7 +25,7 @@ public class NotificacaoConsumer {
     @RabbitListener(queues = Queues.NOTIFICACAO)
     public void onEvent(EventEnvelope event) {
         if (!eventVerifier.isValid(event)) {
-            return; // assinatura invalida ja logada
+            return;
         }
         log.info("Evento {} aceito (assinatura OK, source={}).", event.getType(), event.getSource());
 

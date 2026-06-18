@@ -10,9 +10,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Mantem o read model do catalogo a partir dos eventos de dominio e atende as consultas REST.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -37,7 +34,6 @@ public class CatalogService {
         return repository.findById(id);
     }
 
-    /** Insere ou atualiza um item do catalogo a partir de promocao.publicada. */
     public void upsert(PromocaoPayload payload) {
         CatalogPromocao existing = repository.findById(payload.getId()).orElse(null);
         CatalogPromocao entity = CatalogPromocao.builder()
@@ -58,7 +54,6 @@ public class CatalogService {
         log.info("Catalogo atualizado (upsert): {} - {}", entity.getId(), entity.getTitle());
     }
 
-    /** Marca um item como destaque (hot) e atualiza o score. */
     public void markHot(String id, Integer score) {
         if (id == null) {
             log.warn("Catalogo: destaque ignorado, promotionId ausente no evento.");

@@ -6,9 +6,6 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Payload do evento promocao.destaque publicado quando uma promocao atinge o hot deal threshold.
- */
 @Data
 @Builder
 public class DestaquePayload {

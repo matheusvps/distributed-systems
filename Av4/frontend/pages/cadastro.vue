@@ -92,7 +92,6 @@ async function submit() {
       subtitle="Publique uma oferta da sua loja. Ela será validada antes de entrar no catálogo."
     />
 
-    <!-- Publicando como (perfil da loja) -->
     <div class="card mb-5 flex items-center gap-3 p-4">
       <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pine-800 text-acid-300">
         <Icon name="store" :size="20" />

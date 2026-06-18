@@ -6,10 +6,6 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Payload dos eventos promocao.recebida / promocao.publicada / promocao.destaque
- * (espelha o contrato do MS Promocao).
- */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PromocaoPayload {

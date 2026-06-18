@@ -10,13 +10,6 @@ import org.springframework.amqp.core.TopicExchange;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Declara as filas do Gateway:
- * - fila.gateway.events: catalogo (promocao.publicada + promocao.destaque) no exchange de eventos.
- * - fila.gateway.notif: notificacoes por categoria (promocao.categoria.#) no exchange de notificacoes.
- *
- * Os TopicExchange (eventsExchange / notificationsExchange) vem da shared-lib RabbitMessagingConfig.
- */
 @Configuration
 public class RabbitConfig {
 

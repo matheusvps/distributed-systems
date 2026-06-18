@@ -10,8 +10,6 @@ const store = useNotificacoesStore()
 const user = useUserStore()
 const { open, close } = useNotificationPanel()
 
-/* ── Global notification stream ───────────────────────────────────────────
-   Lives here (always-mounted in the layout) so events arrive on any page. */
 const { status, connect } = useSse({
   onMessage(raw) {
     try {
@@ -25,10 +23,6 @@ const { status, connect } = useSse({
 onMounted(() => connect(user.consumerId))
 watch(() => user.consumerId, (id) => connect(id))
 
-/* ── Open / read / drop lifecycle ─────────────────────────────────────────
-   Open  → mark everything read (badge clears, items stay visible).
-   While open → new arrivals are marked read too, so they're "seen".
-   Close → drop everything read, so old notifications don't reappear. */
 watch(open, (isOpen, wasOpen) => {
   if (isOpen) store.markAllRead()
   else if (wasOpen) store.dropRead()
@@ -46,7 +40,6 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
-/* ── Display helpers ──────────────────────────────────────────────────────*/
 const statusMeta = computed<Record<SseStatus, { label: string; dot: string; text: string }>>(() => ({
   idle: { label: 'Inativo', dot: 'bg-bone-400', text: 'text-ink-400' },
   connecting: { label: 'Conectando…', dot: 'bg-amber-400 animate-pulse', text: 'text-amber-600' },
@@ -70,7 +63,6 @@ function icon(type: string) {
 
 <template>
   <Teleport to="body">
-    <!-- Backdrop -->
     <Transition name="fade">
       <div
         v-if="open"
@@ -79,7 +71,6 @@ function icon(type: string) {
       />
     </Transition>
 
-    <!-- Drawer -->
     <Transition name="drawer">
       <aside
         v-if="open"
@@ -87,7 +78,6 @@ function icon(type: string) {
         role="dialog"
         aria-label="Notificações"
       >
-        <!-- Header -->
         <header class="flex items-center gap-3 border-b border-bone-200 px-5 py-4">
           <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-pine-800 text-acid-300">
             <Icon name="bell" :size="20" />
@@ -115,7 +105,6 @@ function icon(type: string) {
           </button>
         </header>
 
-        <!-- Feed -->
         <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <div
             v-if="!store.feed.length"

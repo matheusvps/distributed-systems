@@ -17,26 +17,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Configuracao de mensageria compartilhada por todos os microsservicos:
- * converter JSON (Jackson) e os dois topic exchanges. As filas e bindings sao
- * declarados por cada servico (apenas o que consome).
- */
 @Configuration
 public class RabbitMessagingConfig {
 
-    /**
-     * ObjectMapper padrao. Os MS consumidores (sem spring-web) nao recebem o ObjectMapper
-     * autoconfigurado pelo Spring Boot, entao garantimos um aqui (com suporte a java.time
-     * e datas em ISO-8601). No Gateway (web) o autoconfig faz back-off via ConditionalOnMissingBean.
-     */
     @Bean
     @ConditionalOnMissingBean
     public ObjectMapper objectMapper() {
         return JsonMapper.builder()
                 .addModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-                // Eventos podem carregar campos extras (ex.: createdAt) que nem todo DTO mapeia.
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .build();
     }
@@ -53,10 +42,6 @@ public class RabbitMessagingConfig {
         return template;
     }
 
-    /**
-     * Listener factory compartilhada: usa o converter Jackson e NAO recoloca na fila
-     * mensagens que falharam (evita storms de redelivery de mensagens "envenenadas").
-     */
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             SimpleRabbitListenerContainerFactoryConfigurer configurer,

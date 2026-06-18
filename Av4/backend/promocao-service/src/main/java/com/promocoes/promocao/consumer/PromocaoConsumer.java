@@ -15,9 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Consome promocao.recebida: valida assinatura, valida/persiste e publica promocao.publicada.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -33,7 +30,7 @@ public class PromocaoConsumer {
     @RabbitListener(queues = Queues.PROMOCAO)
     public void onPromocaoRecebida(EventEnvelope event) {
         if (!eventVerifier.isValid(event)) {
-            return; // assinatura invalida ja logada
+            return;
         }
         log.info("Evento {} aceito (assinatura OK, source={}).", event.getType(), event.getSource());
 

@@ -7,10 +7,6 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.util.Base64;
 
-/**
- * Operacoes RSA de baixo nivel: assinatura/verificacao com SHA256withRSA, saida em Base64.
- * Equivalente ao crypto RSA-SHA256 do projeto Node original.
- */
 @Service
 public class SignatureService {
 

@@ -1,7 +1,3 @@
-/**
- * Typed fetch wrapper around the Gateway base URL from runtimeConfig.
- * All REST traffic goes through here.
- */
 export function useApi() {
   const config = useRuntimeConfig()
   const baseURL = config.public.gatewayUrl as string

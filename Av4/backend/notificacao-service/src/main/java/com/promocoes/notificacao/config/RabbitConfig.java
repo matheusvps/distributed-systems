@@ -11,10 +11,6 @@ import org.springframework.amqp.core.TopicExchange;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Declara a fila do MS Notificacao e a vincula a promocao.publicada e
- * promocao.destaque no exchange de eventos.
- */
 @Configuration
 public class RabbitConfig {
 

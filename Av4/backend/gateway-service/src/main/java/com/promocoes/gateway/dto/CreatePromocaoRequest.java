@@ -8,9 +8,6 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
-/**
- * Corpo do POST /api/promocoes.
- */
 @Data
 public class CreatePromocaoRequest {
 

@@ -6,9 +6,6 @@ import type {
   CategoriesResponse
 } from '~/types'
 
-/**
- * Centralized REST calls to the Gateway. Stores consume this service.
- */
 export function useApiService() {
   const api = useApi()
 

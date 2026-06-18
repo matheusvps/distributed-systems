@@ -11,9 +11,6 @@ import org.springframework.amqp.core.TopicExchange;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Declara a fila do MS Ranking e a vincula a promocao.voto no exchange de eventos.
- */
 @Configuration
 public class RabbitConfig {
 

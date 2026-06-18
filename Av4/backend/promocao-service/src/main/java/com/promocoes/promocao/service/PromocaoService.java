@@ -12,9 +12,6 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.Set;
 
-/**
- * Regra de negocio do MS Promocao: valida o payload e persiste a promocao aprovada.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -23,7 +20,6 @@ public class PromocaoService {
     private final PromocaoRepository repository;
     private final Validator validator;
 
-    /** Valida e persiste. Retorna a promocao publicada ou {@code null} se invalida. */
     public PromocaoPayload validateAndPersist(PromocaoPayload payload) {
         Set<ConstraintViolation<PromocaoPayload>> violations = validator.validate(payload);
         if (!violations.isEmpty()) {

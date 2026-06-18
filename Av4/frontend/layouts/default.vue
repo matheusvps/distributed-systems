@@ -31,13 +31,11 @@ function trocarPerfil() {
 
 <template>
   <div class="min-h-screen lg:flex">
-    <!-- Sidebar -->
     <aside
       class="fixed inset-y-0 left-0 z-40 w-72 transform border-r border-bone-200 bg-bone-50/80 backdrop-blur-md transition-transform duration-300 lg:static lg:translate-x-0"
       :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <div class="flex h-full flex-col p-5">
-        <!-- Wordmark -->
         <NuxtLink :to="user.homePath" class="mb-7 flex items-center gap-3 px-1" @click="mobileOpen = false">
           <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-pine-800 text-acid-300 shadow-card">
             <Icon name="tag" :size="20" :stroke-width="2" />
@@ -97,7 +95,6 @@ function trocarPerfil() {
       @click="mobileOpen = false"
     />
 
-    <!-- Main -->
     <div class="flex min-w-0 flex-1 flex-col">
       <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-bone-200 bg-bone-100/80 px-4 py-3 backdrop-blur-md lg:hidden">
         <button class="btn-ghost btn-sm" aria-label="Abrir menu" @click="mobileOpen = !mobileOpen">
@@ -129,7 +126,6 @@ function trocarPerfil() {
       </footer>
     </div>
 
-    <!-- Painel de notificações (só cliente; hospeda a conexão SSE) -->
     <NotificationMenu v-if="user.role === 'cliente'" />
   </div>
 </template>

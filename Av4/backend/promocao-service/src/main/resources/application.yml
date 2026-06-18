@@ -22,7 +22,6 @@ spring:
         dialect: ${DB_DIALECT:org.hibernate.dialect.H2Dialect}
 
 promocoes:
-  # Diretorio compartilhado de chaves RSA (volume keys/). Em docker: /keys
   keys-dir: ${KEYS_DIR:../../keys}
 
 logging:

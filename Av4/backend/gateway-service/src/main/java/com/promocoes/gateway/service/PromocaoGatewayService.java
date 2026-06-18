@@ -17,9 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Recebe as requisicoes REST do frontend e publica os eventos de dominio correspondentes.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -29,7 +26,6 @@ public class PromocaoGatewayService {
 
     private final DomainEventPublisher publisher;
 
-    /** Publica promocao.recebida e retorna o envelope (para extrair eventId/promotionId). */
     public PublishResult submitPromocao(CreatePromocaoRequest req) {
         String id = UUID.randomUUID().toString();
 
@@ -54,7 +50,6 @@ public class PromocaoGatewayService {
         return new PublishResult(id, event.getEventId());
     }
 
-    /** Publica promocao.voto com um resumo da promocao votada. */
     public PublishResult submitVoto(CatalogPromocao promocao, VotoRequest req) {
         Map<String, Object> promo = new LinkedHashMap<>();
         promo.put("id", promocao.getId());

@@ -7,10 +7,6 @@ interface UseSseOptions {
   onStatus?: (status: SseStatus) => void
 }
 
-/**
- * EventSource lifecycle helper. Connect to the notifications stream for a
- * consumerId; cleanly closes the previous connection on reconnect/unmount.
- */
 export function useSse(options: UseSseOptions) {
   const config = useRuntimeConfig()
   const baseURL = config.public.gatewayUrl as string
@@ -42,7 +38,6 @@ export function useSse(options: UseSseOptions) {
     es.onopen = () => setStatus('open')
 
     es.onerror = () => {
-      // EventSource auto-reconnects; surface the transient error state.
       setStatus('error')
     }
 

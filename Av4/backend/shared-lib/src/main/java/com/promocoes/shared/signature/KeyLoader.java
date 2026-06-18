@@ -14,12 +14,6 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Carrega chaves RSA em PEM de um diretorio compartilhado (volume {@code keys/}).
- * Convencao de nomes: {@code <servico>.private.pem} (PKCS#8) e {@code <servico>.public.pem} (SPKI/X.509).
- * As chaves publicas de todos os servicos ficam no mesmo diretorio, entao qualquer servico
- * pode verificar a assinatura de qualquer produtor.
- */
 @Slf4j
 @Component
 public class KeyLoader {

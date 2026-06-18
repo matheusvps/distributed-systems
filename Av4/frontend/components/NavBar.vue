@@ -34,7 +34,6 @@ const links = computed(() => (user.role === 'loja' ? lojaLinks : clienteLinks))
       <span class="flex-1">{{ l.label }}</span>
     </NuxtLink>
 
-    <!-- Notificações: só para cliente; é toggle do painel, não uma rota -->
     <button
       v-if="user.role === 'cliente'"
       type="button"

@@ -4,9 +4,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * CORS liberado em /api/** para o frontend Nuxt (dev). Inclui o endpoint SSE.
- */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 

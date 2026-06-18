@@ -12,10 +12,6 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Read model do catalogo de promocoes, alimentado pelos eventos
- * promocao.publicada (upsert) e promocao.destaque (hot/score).
- */
 @Entity
 @Table(name = "catalog_promocoes")
 @Data

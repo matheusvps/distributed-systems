@@ -16,8 +16,6 @@ onMounted(() => {
 
 <template>
   <div>
-    <!-- mounted flag evita mismatch de hidratação: SSR e 1º render do client
-         mostram o splash; depois o client decide entre entrada e app. -->
     <template v-if="mounted">
       <WelcomeScreen v-if="!user.role" />
       <NuxtLayout v-else>

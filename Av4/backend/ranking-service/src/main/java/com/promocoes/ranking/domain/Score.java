@@ -9,9 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Score de votos por promocao, persistido pelo MS Ranking.
- */
 @Entity
 @Table(name = "scores")
 @Data
@@ -28,6 +25,5 @@ public class Score {
     private int negativeVotes;
     private int score;
 
-    /** Indica se o evento promocao.destaque ja foi publicado para esta promocao (idempotencia). */
     private boolean hotPublished;
 }

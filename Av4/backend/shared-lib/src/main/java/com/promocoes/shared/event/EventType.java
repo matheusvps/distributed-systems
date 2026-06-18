@@ -1,8 +1,5 @@
 package com.promocoes.shared.event;
 
-/**
- * Tipos de evento (campo {@code type} do envelope). Espelham as routing keys de dominio.
- */
 public final class EventType {
 
     public static final String PROMOCAO_RECEBIDA = "promocao.recebida";

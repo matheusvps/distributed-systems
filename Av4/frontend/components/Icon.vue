@@ -1,9 +1,4 @@
 <script setup lang="ts">
-/**
- * Single source of truth for line iconography.
- * All glyphs share a 24×24 viewbox and inherit `currentColor`,
- * so they tint to whatever text colour they sit inside.
- */
 const props = withDefaults(
   defineProps<{ name: string; size?: number | string; strokeWidth?: number }>(),
   { size: 20, strokeWidth: 1.75 }

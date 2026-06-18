@@ -5,9 +5,6 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Payload do evento promocao.publicada (produzido pelo MS Promocao).
- */
 @Data
 public class PromocaoPublicadaPayload {
 

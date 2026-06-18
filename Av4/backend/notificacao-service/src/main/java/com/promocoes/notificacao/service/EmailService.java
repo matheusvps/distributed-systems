@@ -8,10 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-/**
- * Servico de envio de e-mail via Resend (SDK oficial resend-java).
- * Se o provider nao for "resend" ou o api-key estiver em branco, apenas loga (modo mock).
- */
 @Slf4j
 @Service
 public class EmailService {
@@ -25,14 +21,6 @@ public class EmailService {
     @Value("${promocoes.email.from:MS Notificacao <onboarding@resend.dev>}")
     private String from;
 
-    /**
-     * Envia um e-mail. Nunca lanca excecao — erros sao capturados e logados.
-     *
-     * @param to      destinatario
-     * @param subject assunto
-     * @param text    corpo em texto puro
-     * @param html    corpo em HTML
-     */
     public void send(String to, String subject, String text, String html) {
         if (!"resend".equalsIgnoreCase(provider) || apiKey == null || apiKey.isBlank()) {
             log.info("[EMAIL MOCK] to={} subject={} body={}", to, subject, text);

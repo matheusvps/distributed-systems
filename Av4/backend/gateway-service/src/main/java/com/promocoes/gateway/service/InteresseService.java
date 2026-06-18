@@ -8,9 +8,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/**
- * Gerencia os interesses (consumerId x category) usados para filtrar as notificacoes.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -18,7 +15,6 @@ public class InteresseService {
 
     private final InteresseRepository repository;
 
-    /** Registra o interesse (idempotente) e retorna as categorias atuais do consumidor. */
     public List<String> register(String consumerId, String category) {
         repository.findByConsumerIdAndCategory(consumerId, category)
                 .orElseGet(() -> repository.save(
@@ -27,7 +23,6 @@ public class InteresseService {
         return repository.findCategoriesByConsumerId(consumerId);
     }
 
-    /** Remove o interesse e retorna as categorias restantes do consumidor. */
     public List<String> remove(String consumerId, String category) {
         repository.findByConsumerIdAndCategory(consumerId, category)
                 .ifPresent(repository::delete);

@@ -1,4 +1,3 @@
-/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     './components/**/*.{vue,js,ts}',
@@ -10,7 +9,6 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Warm, green-tinted paper neutrals — never sterile white.
         bone: {
           50: '#fafbf6',
           100: '#f3f5ec',
@@ -18,7 +16,6 @@ export default {
           300: '#d4d9c4',
           400: '#b6bda1'
         },
-        // Deep pine — the primary voice of the interface.
         pine: {
           50: '#edf6f0',
           100: '#d2ebdb',
@@ -32,7 +29,6 @@ export default {
           900: '#0f2d20',
           950: '#081a12'
         },
-        // Acid lime — sharp accent for deals, emphasis, energy.
         acid: {
           50: '#f7fce8',
           100: '#ecf8c8',
@@ -45,7 +41,6 @@ export default {
           800: '#445717',
           900: '#3a4a18'
         },
-        // Warm green-black ink for text.
         ink: {
           DEFAULT: '#142019',
           900: '#142019',

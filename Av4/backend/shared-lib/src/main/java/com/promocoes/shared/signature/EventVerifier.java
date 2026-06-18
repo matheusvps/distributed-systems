@@ -6,11 +6,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-/**
- * Verifica a assinatura de um {@link EventEnvelope} contra a chave publica do produtor.
- * Centraliza a politica de aceite: eventos sem assinatura, com produtor desconhecido
- * ou com assinatura invalida sao rejeitados (e logados).
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

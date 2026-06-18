@@ -15,10 +15,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 
-/**
- * Regra de negocio do MS Notificacao: processa eventos de dominio,
- * envia e-mails, publica notificacoes por categoria e persiste o log.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,10 +26,6 @@ public class NotificacaoService {
     private final EmailService emailService;
     private final DomainEventPublisher publisher;
 
-    /**
-     * Processa o evento promocao.publicada: envia e-mail ao lojista e publica
-     * notificacao por categoria.
-     */
     public void onPromocaoPublicada(PromocaoPublicadaPayload payload) {
         String subject = "Sua promocao \"" + payload.getTitle() + "\" foi aprovada!";
         String body = "Parabens! Sua promocao \"" + payload.getTitle() + "\" na loja " + payload.getStore()
@@ -72,10 +64,6 @@ public class NotificacaoService {
         this.log.info("Notificacao categoria salva para promocao {}", payload.getId());
     }
 
-    /**
-     * Processa o evento promocao.destaque: envia e-mail ao lojista e publica
-     * notificacao por categoria com tag hot deal.
-     */
     public void onPromocaoDestaque(PromocaoDestaquePayload payload) {
         String subject = "🔥 Sua promocao \"" + payload.getTitle() + "\" virou HOT DEAL!";
         String body = "Incrivel! Sua promocao \"" + payload.getTitle() + "\" na loja " + payload.getStore()

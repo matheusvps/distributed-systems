@@ -16,10 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
-/**
- * Regra de negocio do MS Ranking: acumula votos por promocao e publica destaque
- * quando o score atinge o threshold configurado.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

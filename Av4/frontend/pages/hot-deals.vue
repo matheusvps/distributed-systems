@@ -19,7 +19,6 @@ async function load() {
   error.value = ''
   try {
     const res = await api.getPromotions({ hot: true })
-    // Defensive: filter client-side too, in case the gateway ignores the flag.
     items.value = (res?.promotions ?? []).filter((p) => p.hot !== false)
   } catch (e: any) {
     error.value = e?.data?.message || e?.message || 'Falha ao carregar hot deals'

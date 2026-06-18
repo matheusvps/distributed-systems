@@ -4,9 +4,6 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
-/**
- * Sub-objeto promotion dentro do payload de promocao.voto.
- */
 @Data
 public class PromotionInfo {
 

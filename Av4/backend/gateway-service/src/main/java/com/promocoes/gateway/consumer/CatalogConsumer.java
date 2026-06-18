@@ -14,9 +14,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * Consome promocao.publicada (upsert no catalogo) e promocao.destaque (marca hot + score).
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -29,16 +26,14 @@ public class CatalogConsumer {
     @RabbitListener(queues = Queues.GATEWAY_EVENTS)
     public void onEvent(EventEnvelope event) {
         if (!eventVerifier.isValid(event)) {
-            return; // assinatura invalida ja logada
+            return;
         }
         log.info("Evento {} aceito (assinatura OK, source={}).", event.getType(), event.getSource());
 
         if (EventType.PROMOCAO_PUBLICADA.equals(event.getType())) {
-            // promocao.publicada usa o payload completo da promocao (campo id).
             PromocaoPayload payload = objectMapper.convertValue(event.getPayload(), PromocaoPayload.class);
             catalogService.upsert(payload);
         } else if (EventType.PROMOCAO_DESTAQUE.equals(event.getType())) {
-            // promocao.destaque usa "promotionId" e "score" (assinado pelo ranking).
             @SuppressWarnings("unchecked")
             Map<String, Object> p = objectMapper.convertValue(event.getPayload(), Map.class);
             String promotionId = p.get("promotionId") != null ? String.valueOf(p.get("promotionId")) : null;

@@ -13,11 +13,6 @@ export interface Submission {
   submittedAt: string
 }
 
-/**
- * Rastreia promoções recém-enviadas pela loja. O catálogo só lista promoções
- * já publicadas (evento promocao.publicada), então guardamos as submissões
- * localmente como "validando" até elas aparecerem publicadas.
- */
 export const useMinhasStore = defineStore('minhas', {
   state: () => ({
     submissions: [] as Submission[]
@@ -31,7 +26,6 @@ export const useMinhasStore = defineStore('minhas', {
         const parsed = JSON.parse(raw)
         if (Array.isArray(parsed)) this.submissions = parsed
       } catch {
-        /* ignore corrupt value */
       }
     },
     persist() {
@@ -42,7 +36,6 @@ export const useMinhasStore = defineStore('minhas', {
       this.submissions.unshift(sub)
       this.persist()
     },
-    /** Remove submissões cujos ids já constam no catálogo (já publicadas). */
     prunePublished(publishedIds: string[]) {
       const set = new Set(publishedIds)
       const before = this.submissions.length

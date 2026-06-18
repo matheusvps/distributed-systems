@@ -3,8 +3,6 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt'],
   css: ['~/assets/css/main.css'],
-  // Stores call useApiService() without an explicit import, so register
-  // services/ alongside the default composables/ & utils/ auto-import dirs.
   imports: {
     dirs: ['services']
   },
