@@ -12,6 +12,7 @@ FROM eclipse-temurin:21-jre
 ARG SERVICE
 WORKDIR /app
 COPY --from=build /build/${SERVICE}/target/${SERVICE}.jar app.jar
-# Diretorio de chaves RSA montado como volume compartilhado.
-ENV KEYS_DIR=/keys
+# Diretorios de chaves montados por volume: privadas por servico, publicas compartilhadas.
+ENV PRIVATE_KEYS_DIR=/keys/private
+ENV PUBLIC_KEYS_DIR=/keys/public
 ENTRYPOINT ["java", "-jar", "app.jar"]

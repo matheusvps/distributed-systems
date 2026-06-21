@@ -22,8 +22,9 @@ spring:
         dialect: ${DB_DIALECT:org.hibernate.dialect.H2Dialect}
 
 promocoes:
-  # Diretorio compartilhado de chaves RSA (volume keys/). Em docker: /keys
-  keys-dir: ${KEYS_DIR:../../keys}
+  # Chaves privadas locais do servico e chaves publicas compartilhadas.
+  private-keys-dir: ${PRIVATE_KEYS_DIR:../../keys/private}
+  public-keys-dir: ${PUBLIC_KEYS_DIR:../../keys/public}
   email:
     provider: ${EMAIL_PROVIDER:resend}
     api-key: ${RESEND_API_KEY:}

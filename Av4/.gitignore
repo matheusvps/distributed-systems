@@ -1,5 +1,5 @@
 # Chaves RSA (geradas; nunca versionar privadas)
-keys/*.pem
+keys/**/*.pem
 
 # Java / Maven
 **/target/

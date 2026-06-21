@@ -53,7 +53,9 @@ Alunos: Matheus Vinicius Passos de Santana · Lucas Yukio Fukuda Matsumoto
 ```
 Av4/
 ├── README.md  ·  .env.example  ·  docs/payloads.md
-├── keys/                         (pares RSA gerados; volume compartilhado)
+├── keys/
+│   ├── private/                  (chave privada de cada microsservico, isolada por volume)
+│   └── public/                   (chaves publicas compartilhadas para verificacao)
 ├── scripts/generate-keys.sh
 ├── backend/
 │   ├── pom.xml                   (parent / agregador Maven)
@@ -94,10 +96,10 @@ cd Av4 && bash scripts/generate-keys.sh
 
 # 3. Backend (cada serviço em um terminal, a partir do módulo)
 cd Av4/backend && mvn -q -DskipTests install
-cd gateway-service     && KEYS_DIR=../../keys mvn spring-boot:run
-cd ../promocao-service && KEYS_DIR=../../keys mvn spring-boot:run
-cd ../ranking-service  && KEYS_DIR=../../keys mvn spring-boot:run
-cd ../notificacao-service && KEYS_DIR=../../keys mvn spring-boot:run
+cd gateway-service     && PRIVATE_KEYS_DIR=../../keys/private PUBLIC_KEYS_DIR=../../keys/public mvn spring-boot:run
+cd ../promocao-service && PRIVATE_KEYS_DIR=../../keys/private PUBLIC_KEYS_DIR=../../keys/public mvn spring-boot:run
+cd ../ranking-service  && PRIVATE_KEYS_DIR=../../keys/private PUBLIC_KEYS_DIR=../../keys/public mvn spring-boot:run
+cd ../notificacao-service && PRIVATE_KEYS_DIR=../../keys/private PUBLIC_KEYS_DIR=../../keys/public mvn spring-boot:run
 
 # 4. Frontend
 cd Av4/frontend && npm install && npm run dev   # http://localhost:3000
@@ -135,7 +137,8 @@ Teste rápido: `curl -N "http://localhost:8080/api/notificacoes/stream?consumerI
 | `RABBITMQ_HOST/PORT/USER/PASS` | `localhost/5672/guest/guest` | conexão RabbitMQ |
 | `DB_URL/DB_USER/DB_PASS/DB_DRIVER/DB_DIALECT` | H2 file | datasource (PostgreSQL no compose) |
 | `HOT_DEAL_THRESHOLD` | `5` | score (positivos−negativos) p/ virar hot deal |
-| `KEYS_DIR` | `../../keys` (local) / `/keys` (docker) | diretório das chaves RSA |
+| `PRIVATE_KEYS_DIR` | `../../keys/private` (local) / `/keys/private` (docker) | diretório da chave privada do serviço |
+| `PUBLIC_KEYS_DIR` | `../../keys/public` (local) / `/keys/public` (docker) | diretório das chaves públicas para verificação |
 | `EMAIL_PROVIDER` | `resend` | `resend` (real) ou qualquer outro = mock |
 | `RESEND_API_KEY` | _(vazio)_ | chave Resend; sem ela → mock (loga) |
 | `EMAIL_FROM` | `MS Notificacao <onboarding@resend.dev>` | remetente |
@@ -155,7 +158,7 @@ Exemplos completos de cada payload em [`docs/payloads.md`](docs/payloads.md).
 ## Assinatura digital (RSA)
 
 Migrada do Node para Java em `shared-lib`:
-- `KeyLoader` — carrega PEM (PKCS#8 privada / X.509 pública) do diretório de chaves.
+- `KeyLoader` — carrega a chave privada local do serviço e as chaves públicas compartilhadas a partir de diretórios separados.
 - `SignatureService` — `SHA256withRSA`, saída Base64.
 - `EventSigner` / `EventVerifier` — assinam/verificam o **JSON canônico** do envelope
   (`CanonicalJson`): chaves ordenadas e números normalizados, garantindo bytes idênticos

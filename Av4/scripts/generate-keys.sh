@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Gera pares RSA-2048 (PKCS#8 privada + SPKI/X.509 publica) para os 4 microsservicos.
-# Todas as chaves ficam no mesmo diretorio keys/ (volume compartilhado): cada servico
-# usa sua privada para assinar e qualquer publica para verificar.
+# As chaves privadas ficam em keys/private/ por servico; as publicas em keys/public/.
 set -euo pipefail
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/keys"
-mkdir -p "$DIR"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PRIVATE_DIR="$ROOT/keys/private"
+PUBLIC_DIR="$ROOT/keys/public"
+mkdir -p "$PRIVATE_DIR" "$PUBLIC_DIR"
 
 for svc in gateway promocao ranking notificacao; do
-  priv="$DIR/$svc.private.pem"
-  pub="$DIR/$svc.public.pem"
+  priv="$PRIVATE_DIR/$svc.private.pem"
+  pub="$PUBLIC_DIR/$svc.public.pem"
   if [[ -f "$priv" && -f "$pub" ]]; then
     echo "Chaves de $svc ja existem. Pulando."
     continue
@@ -20,5 +21,7 @@ for svc in gateway promocao ranking notificacao; do
   echo "Chaves de $svc geradas."
 done
 
-echo "Chaves disponiveis em: $DIR"
-ls -1 "$DIR"
+echo "Chaves privadas disponiveis em: $PRIVATE_DIR"
+ls -1 "$PRIVATE_DIR"
+echo "Chaves publicas disponiveis em: $PUBLIC_DIR"
+ls -1 "$PUBLIC_DIR"

@@ -34,24 +34,31 @@ services:
       timeout: 5s
       retries: 10
 
-  # Gera os pares RSA dos 4 servicos no volume compartilhado "keys" (executa e sai).
+  # Gera os pares RSA, mantendo cada chave privada no volume do proprio servico.
   keygen:
     image: alpine:3.20
     container_name: av4-keygen
     volumes:
-      - keys:/keys
+      - keys-public:/keys/public
+      - gateway-private:/private/gateway
+      - promocao-private:/private/promocao
+      - ranking-private:/private/ranking
+      - notificacao-private:/private/notificacao
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         apk add --no-cache openssl >/dev/null;
         for s in gateway promocao ranking notificacao; do
-          if [ ! -f /keys/$$s.private.pem ]; then
-            openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /keys/$$s.private.pem 2>/dev/null;
-            openssl pkey -in /keys/$$s.private.pem -pubout -out /keys/$$s.public.pem 2>/dev/null;
+          priv_dir=/private/$$s;
+          mkdir -p "$$priv_dir";
+          if [ ! -f "$$priv_dir/$$s.private.pem" ]; then
+            openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$$priv_dir/$$s.private.pem" 2>/dev/null;
+            openssl pkey -in "$$priv_dir/$$s.private.pem" -pubout -out "/keys/public/$$s.public.pem" 2>/dev/null;
+            chmod 600 "$$priv_dir/$$s.private.pem";
             echo "chaves de $$s geradas";
           fi;
         done;
-        echo "chaves prontas:"; ls -1 /keys
+        echo "chaves publicas prontas:"; ls -1 /keys/public
 
   gateway-service:
     build:
@@ -71,11 +78,13 @@ services:
       DB_PASS: promo
       DB_DRIVER: org.postgresql.Driver
       DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
-      KEYS_DIR: /keys
+      PRIVATE_KEYS_DIR: /keys/private
+      PUBLIC_KEYS_DIR: /keys/public
     ports:
       - "8080:8080"
     volumes:
-      - keys:/keys:ro
+      - gateway-private:/keys/private:ro
+      - keys-public:/keys/public:ro
 
   promocao-service:
     build:
@@ -95,9 +104,11 @@ services:
       DB_PASS: promo
       DB_DRIVER: org.postgresql.Driver
       DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
-      KEYS_DIR: /keys
+      PRIVATE_KEYS_DIR: /keys/private
+      PUBLIC_KEYS_DIR: /keys/public
     volumes:
-      - keys:/keys:ro
+      - promocao-private:/keys/private:ro
+      - keys-public:/keys/public:ro
 
   ranking-service:
     build:
@@ -118,9 +129,11 @@ services:
       DB_DRIVER: org.postgresql.Driver
       DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       HOT_DEAL_THRESHOLD: ${HOT_DEAL_THRESHOLD:-5}
-      KEYS_DIR: /keys
+      PRIVATE_KEYS_DIR: /keys/private
+      PUBLIC_KEYS_DIR: /keys/public
     volumes:
-      - keys:/keys:ro
+      - ranking-private:/keys/private:ro
+      - keys-public:/keys/public:ro
 
   notificacao-service:
     build:
@@ -144,9 +157,11 @@ services:
       DB_PASS: promo
       DB_DRIVER: org.postgresql.Driver
       DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
-      KEYS_DIR: /keys
+      PRIVATE_KEYS_DIR: /keys/private
+      PUBLIC_KEYS_DIR: /keys/public
     volumes:
-      - keys:/keys:ro
+      - notificacao-private:/keys/private:ro
+      - keys-public:/keys/public:ro
 
   frontend:
     build:
@@ -162,5 +177,9 @@ services:
       - "3000:3000"
 
 volumes:
-  keys:
+  keys-public:
+  gateway-private:
+  promocao-private:
+  ranking-private:
+  notificacao-private:
   pgdata:
