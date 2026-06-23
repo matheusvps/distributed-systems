@@ -227,3 +227,53 @@ class RaftNode:
         for pid in config.peer_ids(self.node_id):
             self._replicate_to_peer(pid)
         self._advance_commit_index()
+
+    # ----- client operations (ClientService) -----
+    def _leader_hint(self):
+        if self.leader_id and self.leader_id in config.NODE_ADDRESSES:
+            return config.NODE_ADDRESSES[self.leader_id]
+        return ""
+
+    def handle_publish(self, key, value):
+        with self.lock:
+            if self.state != "Lider":
+                return {"success": False, "leader_hint": self._leader_hint(),
+                        "index": 0, "message": "not_leader"}
+            index = self.last_log_index() + 1
+            self.log.append({"term": self.current_term, "index": index,
+                             "key": key, "value": value})
+            self._persist()
+            self.log_event(f"<- client publish {key}={value} (index={index})")
+
+        self.replicate_to_all()
+
+        with self.lock:
+            if self.commit_index >= index:
+                return {"success": True, "leader_hint": "",
+                        "index": index, "message": "ok"}
+            return {"success": False, "leader_hint": "",
+                    "index": index, "message": "no_quorum"}
+
+    def handle_consume(self, key):
+        with self.lock:
+            committed = self.log[: self.commit_index]
+            pending = len(self.log) - self.commit_index
+            latest = {}
+            order = []
+            for e in committed:
+                if e["key"] not in latest:
+                    order.append(e["key"])
+                latest[e["key"]] = e
+            if key:
+                items = [latest[key]] if key in latest else []
+            else:
+                items = [latest[k] for k in order]
+            return {
+                "success": True,
+                "items": [{"key": e["key"], "value": e["value"], "index": e["index"]}
+                          for e in items],
+                "leader_hint": self._leader_hint(),
+                "is_leader": self.state == "Lider",
+                "committed_index": self.commit_index,
+                "pending_count": pending,
+            }
