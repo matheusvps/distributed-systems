@@ -277,3 +277,69 @@ class RaftNode:
                 "committed_index": self.commit_index,
                 "pending_count": pending,
             }
+
+    # ----- election -----
+    def start_election(self):
+        with self.lock:
+            self.state = "Candidato"
+            self.current_term += 1
+            self.voted_for = self.node_id
+            self.leader_id = None
+            self._reset_election_deadline()
+            self._persist()
+            term = self.current_term
+            args = {
+                "term": term,
+                "candidate_id": self.node_id,
+                "last_log_index": self.last_log_index(),
+                "last_log_term": self.last_log_term(),
+            }
+            self.log_event(f"iniciou eleicao no termo {term}")
+
+        votes = 1  # vote for self
+        for pid in config.peer_ids(self.node_id):
+            reply = self.transport.send_request_vote(pid, args)
+            if reply is None:
+                continue
+            with self.lock:
+                if reply["term"] > self.current_term:
+                    self.current_term = reply["term"]
+                    self.voted_for = None
+                    self._become_follower(reply["term"], None)
+                    return
+                if self.state != "Candidato" or self.current_term != term:
+                    return
+            if reply["vote_granted"]:
+                votes += 1
+
+        with self.lock:
+            if self.state == "Candidato" and self.current_term == term and votes >= config.QUORUM:
+                self._become_leader()
+            elif self.state == "Candidato":
+                self.state = "Seguidor"
+                self._reset_election_deadline()
+
+    # ----- ticker -----
+    def tick(self):
+        now = time.time()
+        with self.lock:
+            state = self.state
+        if state == "Lider":
+            if now - self.last_heartbeat_sent >= config.HEARTBEAT_INTERVAL:
+                with self.lock:
+                    self.last_heartbeat_sent = now
+                self.replicate_to_all()
+        else:
+            with self.lock:
+                expired = now >= self.election_deadline
+            if expired:
+                self.start_election()
+
+    def run_ticker(self):
+        self.running = True
+        while self.running:
+            time.sleep(config.TICK_INTERVAL)
+            try:
+                self.tick()
+            except Exception as exc:  # never let the ticker die
+                self.log_event(f"erro no ticker: {exc}")
