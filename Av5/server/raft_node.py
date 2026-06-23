@@ -69,3 +69,49 @@ class RaftNode:
     # ----- election timer -----
     def _reset_election_deadline(self):
         self.election_deadline = time.time() + random.uniform(*config.ELECTION_TIMEOUT_RANGE)
+
+    # ----- state transitions -----
+    def _become_follower(self, term, leader_id):
+        if term > self.current_term:
+            self.current_term = term
+            self.voted_for = None
+        self.state = "Seguidor"
+        self.leader_id = leader_id
+        self._reset_election_deadline()
+        self._persist()
+
+    def _become_leader(self):
+        self.state = "Lider"
+        self.leader_id = self.node_id
+        nxt = self.last_log_index() + 1
+        self.next_index = {pid: nxt for pid in config.peer_ids(self.node_id)}
+        self.match_index = {pid: 0 for pid in config.peer_ids(self.node_id)}
+        self.last_heartbeat_sent = 0.0
+        self.log_event(f"eleito LIDER no termo {self.current_term}")
+
+    # ----- RequestVote (RaftService) -----
+    def handle_request_vote(self, term, candidate_id, last_log_index, last_log_term):
+        with self.lock:
+            if term < self.current_term:
+                return {"term": self.current_term, "vote_granted": False}
+
+            if term > self.current_term:
+                self.current_term = term
+                self.voted_for = None
+                self.state = "Seguidor"
+                self.leader_id = None
+
+            can_vote = self.voted_for in (None, candidate_id)
+            up_to_date = self._is_up_to_date(last_log_index, last_log_term)
+
+            if can_vote and up_to_date:
+                self.voted_for = candidate_id
+                self._reset_election_deadline()
+                self._persist()
+                self.log_event(f"VOTOU em node{candidate_id} no termo {self.current_term}")
+                return {"term": self.current_term, "vote_granted": True}
+
+            self._persist()
+            reason = "ja votou" if not can_vote else "log desatualizado"
+            self.log_event(f"RECUSOU voto p/ node{candidate_id}: {reason}")
+            return {"term": self.current_term, "vote_granted": False}
