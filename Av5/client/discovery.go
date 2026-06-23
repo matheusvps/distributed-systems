@@ -76,8 +76,16 @@ func (c *Cluster) Publish(key, value string) error {
 				time.Sleep(1 * time.Second)
 			}
 		case "no_quorum":
-			log.Printf("sem quorum no momento; tentando novamente...")
-			time.Sleep(1 * time.Second)
+			// The entry is already pending in the leader's log.
+			// Do NOT re-issue Publish (would append a duplicate entry).
+			// Wait briefly (up to 2 times) in case quorum is restored, then give up.
+			const maxNoQuorumRetries = 2
+			for nqRetry := 0; nqRetry < maxNoQuorumRetries; nqRetry++ {
+				log.Printf("sem quorum (tentativa %d/%d); aguardando quorum...", nqRetry+1, maxNoQuorumRetries)
+				time.Sleep(2 * time.Second)
+			}
+			log.Printf("sem quorum apos espera; entrada pendente no lider %s", addr)
+			return errors.New("pendente — sem quorum no momento; tente novamente mais tarde")
 		}
 	}
 	return errors.New("nao foi possivel publicar (sem lider/quorum)")

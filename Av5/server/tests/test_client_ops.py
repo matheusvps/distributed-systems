@@ -43,6 +43,7 @@ def test_leader_publish_commits_with_quorum(tmp_path):
 
 def test_leader_publish_without_quorum_is_not_committed(tmp_path):
     n = leader(tmp_path, NoAckTransport())
+    n.publish_commit_timeout = 0.1  # keep test fast; no acks so commit never arrives
     reply = n.handle_publish("a", "1")
     assert reply["success"] is False
     assert reply["message"] == "no_quorum"

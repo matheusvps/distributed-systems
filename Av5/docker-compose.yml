@@ -3,24 +3,28 @@ services:
     build: { context: ., dockerfile: server/Dockerfile }
     container_name: av5-node1
     command: ["--id", "1"]
+    restart: unless-stopped
     networks: [raft]
     volumes: ["./data/node1:/app/data"]
   node2:
     build: { context: ., dockerfile: server/Dockerfile }
     container_name: av5-node2
     command: ["--id", "2"]
+    restart: unless-stopped
     networks: [raft]
     volumes: ["./data/node2:/app/data"]
   node3:
     build: { context: ., dockerfile: server/Dockerfile }
     container_name: av5-node3
     command: ["--id", "3"]
+    restart: unless-stopped
     networks: [raft]
     volumes: ["./data/node3:/app/data"]
   node4:
     build: { context: ., dockerfile: server/Dockerfile }
     container_name: av5-node4
     command: ["--id", "4"]
+    restart: unless-stopped
     networks: [raft]
     volumes: ["./data/node4:/app/data"]
   client:

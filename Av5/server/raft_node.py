@@ -1,3 +1,4 @@
+import concurrent.futures
 import random
 import threading
 import time
@@ -29,6 +30,7 @@ class RaftNode:
         self.running = False
         self.election_deadline = 0.0
         self.last_heartbeat_sent = 0.0
+        self.publish_commit_timeout = 3.0  # max seconds to wait for commit in handle_publish
         self._reset_election_deadline()
 
     # ----- logging -----
@@ -96,6 +98,7 @@ class RaftNode:
                 return {"term": self.current_term, "vote_granted": False}
 
             if term > self.current_term:
+                # Intentionally inline (not _become_follower) to avoid resetting election deadline on a vote.
                 self.current_term = term
                 self.voted_for = None
                 self.state = "Seguidor"
@@ -138,14 +141,21 @@ class RaftNode:
                         "conflict_index": prev_log_index}
 
             # append/overwrite entries
+            prev_log_len = len(self.log)
             self._merge_entries(entries)
+            entries_mutated = len(self.log) != prev_log_len
 
             # advance commit index (never beyond what we hold)
+            commit_advanced = False
             if leader_commit > self.commit_index:
                 self.commit_index = min(leader_commit, len(self.log))
                 self._apply_committed()
+                commit_advanced = True
 
-            self._persist()
+            # persist once if anything actually changed (term/vote already persisted
+            # by _become_follower above; here we cover log and commit_index mutations)
+            if entries_mutated or commit_advanced:
+                self._persist()
             if entries:
                 self.log_event(f"OK replicado ate index={self.last_log_index()}",
                                peer_id=leader_id)
@@ -224,8 +234,10 @@ class RaftNode:
                     break
 
     def replicate_to_all(self):
-        for pid in config.peer_ids(self.node_id):
-            self._replicate_to_peer(pid)
+        peers = config.peer_ids(self.node_id)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(peers)) as ex:
+            futures = [ex.submit(self._replicate_to_peer, pid) for pid in peers]
+            concurrent.futures.wait(futures)
         self._advance_commit_index()
 
     # ----- client operations (ClientService) -----
@@ -247,12 +259,22 @@ class RaftNode:
 
         self.replicate_to_all()
 
-        with self.lock:
-            if self.commit_index >= index:
+        # Poll for the entry to be committed (background heartbeats may reach quorum).
+        # We do NOT hold the lock during sleeps.
+        deadline = time.time() + self.publish_commit_timeout
+        poll_interval = 0.1
+        while True:
+            with self.lock:
+                committed = self.commit_index >= index
+            if committed:
                 return {"success": True, "leader_hint": "",
                         "index": index, "message": "ok"}
-            return {"success": False, "leader_hint": "",
-                    "index": index, "message": "no_quorum"}
+            if time.time() >= deadline:
+                break
+            time.sleep(poll_interval)
+
+        return {"success": False, "leader_hint": "",
+                "index": index, "message": "no_quorum"}
 
     def handle_consume(self, key):
         with self.lock:
@@ -296,23 +318,33 @@ class RaftNode:
             }
             self.log_event(f"iniciou eleicao no termo {term}")
 
-        votes = 1  # vote for self
-        for pid in config.peer_ids(self.node_id):
-            reply = self.transport.send_request_vote(pid, args)
-            if reply is None:
-                continue
-            with self.lock:
+        peers = config.peer_ids(self.node_id)
+
+        # Issue all RequestVote RPCs concurrently (network calls outside the lock).
+        def _request_vote(pid):
+            return pid, self.transport.send_request_vote(pid, args)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(peers)) as ex:
+            results = list(ex.map(_request_vote, peers))
+
+        # Aggregate replies under the lock.
+        votes = 1  # self-vote
+        with self.lock:
+            for pid, reply in results:
+                if reply is None:
+                    continue
                 if reply["term"] > self.current_term:
+                    # Higher term seen: step down immediately, abandon election.
                     self.current_term = reply["term"]
                     self.voted_for = None
                     self._become_follower(reply["term"], None)
                     return
                 if self.state != "Candidato" or self.current_term != term:
+                    # State changed while RPCs were in flight (e.g. we heard from a leader).
                     return
-            if reply["vote_granted"]:
-                votes += 1
+                if reply["vote_granted"]:
+                    votes += 1
 
-        with self.lock:
             if self.state == "Candidato" and self.current_term == term and votes >= config.QUORUM:
                 self._become_leader()
             elif self.state == "Candidato":
