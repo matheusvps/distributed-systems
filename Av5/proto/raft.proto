@@ -1,0 +1,57 @@
+syntax = "proto3";
+package raft;
+
+// ---------- Application (client-facing) ----------
+service ClientService {
+  rpc Publish (PublishRequest) returns (PublishReply);
+  rpc Consume (ConsumeRequest) returns (ConsumeReply);
+}
+
+message PublishRequest { string key = 1; string value = 2; }
+message PublishReply {
+  bool   success     = 1;
+  string leader_hint = 2;
+  int64  index       = 3;
+  string message     = 4;
+}
+
+message ConsumeRequest { string key = 1; }
+message ConsumeReply {
+  bool              success         = 1;
+  repeated DataItem items           = 2;
+  string            leader_hint     = 3;
+  bool              is_leader       = 4;
+  int64             committed_index = 5;
+  int64             pending_count   = 6;
+}
+message DataItem { string key = 1; string value = 2; int64 index = 3; }
+
+// ---------- Raft (internal) ----------
+service RaftService {
+  rpc RequestVote   (RequestVoteArgs)   returns (RequestVoteReply);
+  rpc AppendEntries (AppendEntriesArgs) returns (AppendEntriesReply);
+}
+
+message LogEntry { int64 term = 1; int64 index = 2; string key = 3; string value = 4; }
+
+message RequestVoteArgs {
+  int64 term = 1;
+  int32 candidate_id = 2;
+  int64 last_log_index = 3;
+  int64 last_log_term = 4;
+}
+message RequestVoteReply { int64 term = 1; bool vote_granted = 2; }
+
+message AppendEntriesArgs {
+  int64 term = 1;
+  int32 leader_id = 2;
+  int64 prev_log_index = 3;
+  int64 prev_log_term = 4;
+  repeated LogEntry entries = 5;
+  int64 leader_commit = 6;
+}
+message AppendEntriesReply {
+  int64 term = 1;
+  bool  success = 2;
+  int64 conflict_index = 3;
+}
