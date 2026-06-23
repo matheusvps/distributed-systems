@@ -115,3 +115,55 @@ class RaftNode:
             reason = "ja votou" if not can_vote else "log desatualizado"
             self.log_event(f"RECUSOU voto p/ node{candidate_id}: {reason}")
             return {"term": self.current_term, "vote_granted": False}
+
+    # ----- AppendEntries (RaftService) -----
+    def handle_append_entries(self, term, leader_id, prev_log_index,
+                              prev_log_term, entries, leader_commit):
+        with self.lock:
+            if term < self.current_term:
+                return {"term": self.current_term, "success": False, "conflict_index": 0}
+
+            # valid leader for this term (>=): become/stay follower, reset timer
+            self._become_follower(max(term, self.current_term), leader_id)
+
+            # consistency check on prev entry
+            if prev_log_index > len(self.log):
+                return {"term": self.current_term, "success": False,
+                        "conflict_index": len(self.log) + 1}
+            if prev_log_index > 0 and self._term_of(prev_log_index) != prev_log_term:
+                # truncate the conflicting tail and ask leader to back up
+                self.log = self.log[: prev_log_index - 1]
+                self._persist()
+                return {"term": self.current_term, "success": False,
+                        "conflict_index": prev_log_index}
+
+            # append/overwrite entries
+            self._merge_entries(entries)
+
+            # advance commit index (never beyond what we hold)
+            if leader_commit > self.commit_index:
+                self.commit_index = min(leader_commit, len(self.log))
+                self._apply_committed()
+
+            self._persist()
+            if entries:
+                self.log_event(f"OK replicado ate index={self.last_log_index()}",
+                               peer_id=leader_id)
+            return {"term": self.current_term, "success": True, "conflict_index": 0}
+
+    def _merge_entries(self, entries):
+        for e in entries:
+            idx = e["index"]
+            if idx <= len(self.log):
+                if self.log[idx - 1]["term"] != e["term"]:
+                    self.log = self.log[: idx - 1]
+                    self.log.append(e)
+            else:
+                self.log.append(e)
+
+    def _apply_committed(self):
+        while self.last_applied < self.commit_index:
+            e = self.log[self.last_applied]
+            self.last_applied += 1
+            self.log_event(f"APLICADO (committed) index={e['index']} "
+                           f"{e['key']}={e['value']}")
