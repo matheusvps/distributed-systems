@@ -167,3 +167,63 @@ class RaftNode:
             self.last_applied += 1
             self.log_event(f"APLICADO (committed) index={e['index']} "
                            f"{e['key']}={e['value']}")
+
+    # ----- leader replication (uses transport) -----
+    def _build_append_args(self, peer_id):
+        next_idx = self.next_index.get(peer_id, 1)
+        prev_idx = next_idx - 1
+        return {
+            "term": self.current_term,
+            "leader_id": self.node_id,
+            "prev_log_index": prev_idx,
+            "prev_log_term": self._term_of(prev_idx),
+            "entries": list(self.log[next_idx - 1:]),
+            "leader_commit": self.commit_index,
+        }
+
+    def _replicate_to_peer(self, peer_id):
+        with self.lock:
+            if self.state != "Lider":
+                return
+            args = self._build_append_args(peer_id)
+        reply = self.transport.send_append_entries(peer_id, args)
+        if reply is None:
+            return  # peer unreachable; retried on next tick
+        with self.lock:
+            if reply["term"] > self.current_term:
+                self.current_term = reply["term"]
+                self.voted_for = None
+                self._become_follower(reply["term"], None)
+                return
+            if self.state != "Lider":
+                return
+            if reply["success"]:
+                if args["entries"]:
+                    self.match_index[peer_id] = args["entries"][-1]["index"]
+                    self.next_index[peer_id] = self.match_index[peer_id] + 1
+            else:
+                hint = reply.get("conflict_index", 0)
+                self.next_index[peer_id] = max(1, hint if hint > 0
+                                               else self.next_index[peer_id] - 1)
+
+    def _advance_commit_index(self):
+        with self.lock:
+            if self.state != "Lider":
+                return
+            for n in range(len(self.log), self.commit_index, -1):
+                if self._term_of(n) != self.current_term:
+                    continue
+                count = 1  # leader counts itself
+                for pid in config.peer_ids(self.node_id):
+                    if self.match_index.get(pid, 0) >= n:
+                        count += 1
+                if count >= config.QUORUM:
+                    self.commit_index = n
+                    self._apply_committed()
+                    self._persist()
+                    break
+
+    def replicate_to_all(self):
+        for pid in config.peer_ids(self.node_id):
+            self._replicate_to_peer(pid)
+        self._advance_commit_index()
