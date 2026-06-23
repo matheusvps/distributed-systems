@@ -1,0 +1,35 @@
+services:
+  node1:
+    build: { context: ., dockerfile: server/Dockerfile }
+    container_name: av5-node1
+    command: ["--id", "1"]
+    networks: [raft]
+    volumes: ["./data/node1:/app/data"]
+  node2:
+    build: { context: ., dockerfile: server/Dockerfile }
+    container_name: av5-node2
+    command: ["--id", "2"]
+    networks: [raft]
+    volumes: ["./data/node2:/app/data"]
+  node3:
+    build: { context: ., dockerfile: server/Dockerfile }
+    container_name: av5-node3
+    command: ["--id", "3"]
+    networks: [raft]
+    volumes: ["./data/node3:/app/data"]
+  node4:
+    build: { context: ., dockerfile: server/Dockerfile }
+    container_name: av5-node4
+    command: ["--id", "4"]
+    networks: [raft]
+    volumes: ["./data/node4:/app/data"]
+  client:
+    build: { context: ., dockerfile: client/Dockerfile }
+    container_name: av5-client
+    profiles: ["client"]
+    networks: [raft]
+    depends_on: [node1, node2, node3, node4]
+
+networks:
+  raft:
+    driver: bridge
