@@ -1,0 +1,2 @@
+Stubs are generated at Docker build time from ../proto/raft.proto into ./gen
+(package raftpb, import path "av5client/gen"). See client/Dockerfile.
