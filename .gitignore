@@ -20,3 +20,5 @@ dist/
 pip-wheel-metadata/
 .pytest_cache/
 *.pyc
+
+Av5/.venv
