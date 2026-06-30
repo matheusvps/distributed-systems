@@ -13,13 +13,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// seed addresses; client does NOT know who is leader.
 var seeds = []string{"node1:6001", "node2:6002", "node3:6003", "node4:6004"}
 
 const maxAttempts = 12
 
 type Cluster struct {
-	known string // last known leader address (cache)
+	known string
 }
 
 func (c *Cluster) dial(addr string) (pb.ClientServiceClient, *grpc.ClientConn, error) {
@@ -37,7 +36,6 @@ func (c *Cluster) dial(addr string) (pb.ClientServiceClient, *grpc.ClientConn, e
 	return pb.NewClientServiceClient(conn), conn, nil
 }
 
-// candidates returns addresses to try, leader cache first.
 func (c *Cluster) candidates() []string {
 	if c.known == "" {
 		return seeds
@@ -51,7 +49,6 @@ func (c *Cluster) candidates() []string {
 	return out
 }
 
-// Publish redirects to the leader using leader_hint until committed.
 func (c *Cluster) Publish(key, value string) error {
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		addr := c.candidates()[attempt%len(c.candidates())]
@@ -85,9 +82,6 @@ func (c *Cluster) Publish(key, value string) error {
 				time.Sleep(1 * time.Second)
 			}
 		case "no_quorum":
-			// The entry is already pending in the leader's log.
-			// Do NOT re-issue Publish (would append a duplicate entry).
-			// Wait briefly (up to 2 times) in case quorum is restored, then give up.
 			const maxNoQuorumRetries = 2
 			for nqRetry := 0; nqRetry < maxNoQuorumRetries; nqRetry++ {
 				log.Printf("sem quorum (tentativa %d/%d); aguardando quorum...", nqRetry+1, maxNoQuorumRetries)
@@ -100,7 +94,6 @@ func (c *Cluster) Publish(key, value string) error {
 	return errors.New("nao foi possivel publicar (sem lider/quorum)")
 }
 
-// Consume can target any node (leader or replica). Returns committed data only.
 func (c *Cluster) Consume(key string, addr string) (*pb.ConsumeReply, error) {
 	candidates := c.candidates()
 	if addr != "" {

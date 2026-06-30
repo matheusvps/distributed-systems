@@ -33,7 +33,6 @@ class RaftNode:
         self.publish_commit_timeout = 3.0  # max seconds to wait for commit in handle_publish
         self._reset_election_deadline()
 
-    # ----- logging -----
     def log_event(self, msg, peer_id=None):
         prefix = f"node{self.node_id} [{self.state}] (term={self.current_term})"
         if peer_id is not None:
@@ -41,7 +40,6 @@ class RaftNode:
         else:
             print(f"{prefix}: {msg}", flush=True)
 
-    # ----- log helpers -----
     def last_log_index(self):
         return self.log[-1]["index"] if self.log else 0
 
@@ -68,11 +66,9 @@ class RaftNode:
             log=self.log,
         ))
 
-    # ----- election timer -----
     def _reset_election_deadline(self):
         self.election_deadline = time.time() + random.uniform(*config.ELECTION_TIMEOUT_RANGE)
 
-    # ----- state transitions -----
     def _become_follower(self, term, leader_id):
         if term > self.current_term:
             self.current_term = term
@@ -91,14 +87,12 @@ class RaftNode:
         self.last_heartbeat_sent = 0.0
         self.log_event(f"eleito LIDER no termo {self.current_term}")
 
-    # ----- RequestVote (RaftService) -----
     def handle_request_vote(self, term, candidate_id, last_log_index, last_log_term):
         with self.lock:
             if term < self.current_term:
                 return {"term": self.current_term, "vote_granted": False}
 
             if term > self.current_term:
-                # Intentionally inline (not _become_follower) to avoid resetting election deadline on a vote.
                 self.current_term = term
                 self.voted_for = None
                 self.state = "Seguidor"
@@ -119,41 +113,33 @@ class RaftNode:
             self.log_event(f"RECUSOU voto p/ node{candidate_id}: {reason}")
             return {"term": self.current_term, "vote_granted": False}
 
-    # ----- AppendEntries (RaftService) -----
     def handle_append_entries(self, term, leader_id, prev_log_index,
                               prev_log_term, entries, leader_commit):
         with self.lock:
             if term < self.current_term:
                 return {"term": self.current_term, "success": False, "conflict_index": 0}
 
-            # valid leader for this term (>=): become/stay follower, reset timer
             self._become_follower(max(term, self.current_term), leader_id)
 
-            # consistency check on prev entry
             if prev_log_index > len(self.log):
                 return {"term": self.current_term, "success": False,
                         "conflict_index": len(self.log) + 1}
             if prev_log_index > 0 and self._term_of(prev_log_index) != prev_log_term:
-                # truncate the conflicting tail and ask leader to back up
                 self.log = self.log[: prev_log_index - 1]
                 self._persist()
                 return {"term": self.current_term, "success": False,
                         "conflict_index": prev_log_index}
 
-            # append/overwrite entries
             prev_log_len = len(self.log)
             self._merge_entries(entries)
             entries_mutated = len(self.log) != prev_log_len
 
-            # advance commit index (never beyond what we hold)
             commit_advanced = False
             if leader_commit > self.commit_index:
                 self.commit_index = min(leader_commit, len(self.log))
                 self._apply_committed()
                 commit_advanced = True
 
-            # persist once if anything actually changed (term/vote already persisted
-            # by _become_follower above; here we cover log and commit_index mutations)
             if entries_mutated or commit_advanced:
                 self._persist()
             if entries:
@@ -178,7 +164,6 @@ class RaftNode:
             self.log_event(f"APLICADO (committed) index={e['index']} "
                            f"{e['key']}={e['value']}")
 
-    # ----- leader replication (uses transport) -----
     def _build_append_args(self, peer_id):
         next_idx = self.next_index.get(peer_id, 1)
         prev_idx = next_idx - 1
@@ -198,7 +183,7 @@ class RaftNode:
             args = self._build_append_args(peer_id)
         reply = self.transport.send_append_entries(peer_id, args)
         if reply is None:
-            return  # peer unreachable; retried on next tick
+            return
         with self.lock:
             if reply["term"] > self.current_term:
                 self.current_term = reply["term"]
@@ -240,7 +225,6 @@ class RaftNode:
             concurrent.futures.wait(futures)
         self._advance_commit_index()
 
-    # ----- client operations (ClientService) -----
     def _leader_hint(self):
         if self.leader_id and self.leader_id in config.NODE_ADDRESSES:
             return config.NODE_ADDRESSES[self.leader_id]
@@ -259,8 +243,6 @@ class RaftNode:
 
         self.replicate_to_all()
 
-        # Poll for the entry to be committed (background heartbeats may reach quorum).
-        # We do NOT hold the lock during sleeps.
         deadline = time.time() + self.publish_commit_timeout
         poll_interval = 0.1
         while True:
@@ -300,7 +282,6 @@ class RaftNode:
                 "pending_count": pending,
             }
 
-    # ----- election -----
     def start_election(self):
         with self.lock:
             self.state = "Candidato"
@@ -320,27 +301,23 @@ class RaftNode:
 
         peers = config.peer_ids(self.node_id)
 
-        # Issue all RequestVote RPCs concurrently (network calls outside the lock).
         def _request_vote(pid):
             return pid, self.transport.send_request_vote(pid, args)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(peers)) as ex:
             results = list(ex.map(_request_vote, peers))
 
-        # Aggregate replies under the lock.
-        votes = 1  # self-vote
+        votes = 1
         with self.lock:
             for pid, reply in results:
                 if reply is None:
                     continue
                 if reply["term"] > self.current_term:
-                    # Higher term seen: step down immediately, abandon election.
                     self.current_term = reply["term"]
                     self.voted_for = None
                     self._become_follower(reply["term"], None)
                     return
                 if self.state != "Candidato" or self.current_term != term:
-                    # State changed while RPCs were in flight (e.g. we heard from a leader).
                     return
                 if reply["vote_granted"]:
                     votes += 1
@@ -351,7 +328,6 @@ class RaftNode:
                 self.state = "Seguidor"
                 self._reset_election_deadline()
 
-    # ----- ticker -----
     def tick(self):
         now = time.time()
         with self.lock:

@@ -7,7 +7,7 @@ NODE_ADDRESSES = {
     3: "node3:6003",
     4: "node4:6004",
 }
-QUORUM = len(NODE_IDS) // 2 + 1  # always 3 for a 4-node cluster
+QUORUM = len(NODE_IDS) // 2 + 1 
 
 ELECTION_TIMEOUT_RANGE = (3.0, 6.0)  # seconds
 HEARTBEAT_INTERVAL = 1.0             # seconds

@@ -78,7 +78,6 @@ func interactive(c *Cluster) {
 			return
 		}
 		_ = strings.TrimSpace(line)
-		// simple single-token dispatch; for multi-arg use the CLI subcommands
 		fmt.Println("use os subcomandos da CLI: publish/consume")
 		return
 	}
