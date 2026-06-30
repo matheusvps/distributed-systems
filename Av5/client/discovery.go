@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -22,9 +23,16 @@ type Cluster struct {
 }
 
 func (c *Cluster) dial(addr string) (pb.ClientServiceClient, *grpc.ClientConn, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(
+		ctx,
+		addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("falha ao conectar em %s: %w", addr, err)
 	}
 	return pb.NewClientServiceClient(conn), conn, nil
 }
@@ -49,6 +57,7 @@ func (c *Cluster) Publish(key, value string) error {
 		addr := c.candidates()[attempt%len(c.candidates())]
 		cli, conn, err := c.dial(addr)
 		if err != nil {
+			log.Printf("nodo %s indisponivel: %v", addr, err)
 			continue
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -56,7 +65,7 @@ func (c *Cluster) Publish(key, value string) error {
 		cancel()
 		conn.Close()
 		if err != nil {
-			log.Printf("nodo %s indisponivel, tentando outro...", addr)
+			log.Printf("nodo %s indisponivel: %v", addr, err)
 			c.known = ""
 			continue
 		}
