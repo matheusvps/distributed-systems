@@ -194,8 +194,12 @@ class RaftNode:
                 return
             if reply["success"]:
                 if args["entries"]:
-                    self.match_index[peer_id] = args["entries"][-1]["index"]
-                    self.next_index[peer_id] = self.match_index[peer_id] + 1
+                    replicated_through = args["entries"][-1]["index"]
+                else:
+                    # Empty heartbeat: follower confirmed consistency through prev_log_index.
+                    replicated_through = args["prev_log_index"]
+                self.match_index[peer_id] = max(self.match_index.get(peer_id, 0), replicated_through)
+                self.next_index[peer_id] = self.match_index[peer_id] + 1
             else:
                 hint = reply.get("conflict_index", 0)
                 self.next_index[peer_id] = max(1, hint if hint > 0

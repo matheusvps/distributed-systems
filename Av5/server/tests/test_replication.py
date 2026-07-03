@@ -84,3 +84,26 @@ def test_build_args_sends_only_missing_entries(tmp_path):
     assert [e["index"] for e in args["entries"]] == [3]
     assert args["prev_log_index"] == 2
     assert args["prev_log_term"] == 1
+
+def test_empty_heartbeat_updates_match_index_when_follower_in_sync(tmp_path):
+    t = ScriptedTransport({2: [], 3: [], 4: []})
+    n = leader(tmp_path, t)
+    n.current_term = 2
+    n.log = [{"term": 2, "index": 1, "key": "a", "value": "1"}]
+    n.next_index = {2: 2, 3: 2, 4: 2}
+    n.match_index = {2: 0, 3: 0, 4: 0}
+    n._replicate_to_peer(2)
+    assert n.match_index[2] == 1
+    assert n.next_index[2] == 2
+
+def test_commit_after_empty_heartbeats_discover_quorum(tmp_path):
+    t = ScriptedTransport({2: [], 3: [], 4: []})
+    n = leader(tmp_path, t)
+    n.current_term = 2
+    n.log = [{"term": 2, "index": 1, "key": "a", "value": "1"}]
+    n.next_index = {2: 2, 3: 2, 4: 2}
+    n.match_index = {2: 0, 3: 0, 4: 0}
+    for pid in config.peer_ids(1):
+        n._replicate_to_peer(pid)
+    n._advance_commit_index()
+    assert n.commit_index == 1
