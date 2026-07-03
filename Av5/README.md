@@ -41,10 +41,13 @@ docker compose build
 ```bash
 cd Av5
 python3 -m venv .venv && . .venv/bin/activate
-pip install -r server/requirements.txt
+pip install -r server/requirements-dev.txt
 ./scripts/gen-proto.sh
-python -m pytest server/tests -v
+./scripts/run-tests.sh -v
 ```
+
+`scripts/run-tests.sh` define `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` para ignorar plugins
+de terceiros no ambiente (ex.: ROS `launch_testing`).
 
 ## Demonstração interativa (cenários 1–5)
 

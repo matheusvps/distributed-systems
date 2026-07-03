@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regenerate Python gRPC stubs locally (Go stubs are generated at Docker build).
-# Requires: a Python venv with grpcio-tools installed (see server/requirements.txt).
+# Requires: a Python venv with grpcio-tools installed (see server/requirements-dev.txt).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
