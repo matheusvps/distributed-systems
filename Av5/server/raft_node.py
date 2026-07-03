@@ -31,6 +31,10 @@ class RaftNode:
         self.election_deadline = 0.0
         self.last_heartbeat_sent = 0.0
         self.publish_commit_timeout = 3.0  # max seconds to wait for commit in handle_publish
+        self._election_in_progress = False
+        self._replication_in_progress = False
+        self._workers = concurrent.futures.ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix=f"raft-{node_id}")
         self._reset_election_deadline()
 
     def log_event(self, msg, peer_id=None):
@@ -356,20 +360,54 @@ class RaftNode:
                 self.state = "Seguidor"
                 self._reset_election_deadline()
 
+    def _run_election(self):
+        try:
+            self.start_election()
+        finally:
+            with self.lock:
+                self._election_in_progress = False
+
+    def _submit_election(self):
+        with self.lock:
+            if self._election_in_progress or self.state != "Seguidor":
+                return
+            self._election_in_progress = True
+        self._workers.submit(self._run_election)
+
+    def _run_replication(self):
+        try:
+            self.replicate_to_all()
+        finally:
+            with self.lock:
+                self._replication_in_progress = False
+                self.last_heartbeat_sent = time.time()
+
+    def _submit_replication(self):
+        with self.lock:
+            if self._replication_in_progress or self.state != "Lider":
+                return
+            self._replication_in_progress = True
+        self._workers.submit(self._run_replication)
+
     def tick(self):
         now = time.time()
         with self.lock:
             state = self.state
         if state == "Lider":
-            if now - self.last_heartbeat_sent >= config.HEARTBEAT_INTERVAL:
-                with self.lock:
-                    self.last_heartbeat_sent = now
-                self.replicate_to_all()
+            with self.lock:
+                due = now - self.last_heartbeat_sent >= config.HEARTBEAT_INTERVAL
+            if due:
+                self._submit_replication()
         else:
             with self.lock:
                 expired = now >= self.election_deadline
-            if expired:
-                self.start_election()
+                can_elect = (
+                    expired
+                    and self.state == "Seguidor"
+                    and not self._election_in_progress
+                )
+            if can_elect:
+                self._submit_election()
 
     def run_ticker(self):
         self.running = True

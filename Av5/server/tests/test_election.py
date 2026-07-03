@@ -48,6 +48,9 @@ def test_tick_triggers_election_after_deadline(tmp_path):
     n = node(tmp_path, VoteTransport(granted_from={2, 3}))
     n.election_deadline = time.time() - 1  # already expired
     n.tick()
+    deadline = time.time() + 2
+    while time.time() < deadline and n.state != "Lider":
+        time.sleep(0.05)
     assert n.state == "Lider"
 
 def test_leader_tick_replicates_on_heartbeat_interval(tmp_path):
@@ -58,4 +61,27 @@ def test_leader_tick_replicates_on_heartbeat_interval(tmp_path):
     n.next_index = {pid: 1 for pid in config.peer_ids(1)}
     n.match_index = {pid: 0 for pid in config.peer_ids(1)}
     n.tick()
+    deadline = time.time() + 2
+    while time.time() < deadline and n.match_index.get(2, 0) != 1:
+        time.sleep(0.05)
     assert n.match_index[2] == 1       # replicated via heartbeat
+
+class SlowTransport:
+    def send_request_vote(self, peer_id, args):
+        time.sleep(0.5)
+        return {"term": args["term"], "vote_granted": False}
+    def send_append_entries(self, peer_id, args):
+        time.sleep(0.5)
+        return {"term": args["term"], "success": True, "conflict_index": 0}
+
+def test_tick_returns_without_waiting_on_slow_replication(tmp_path):
+    n = node(tmp_path, SlowTransport())
+    n.state = "Lider"
+    n.leader_id = 1
+    n.current_term = 1
+    n.last_heartbeat_sent = 0.0
+    n.next_index = {pid: 1 for pid in config.peer_ids(1)}
+    n.match_index = {pid: 0 for pid in config.peer_ids(1)}
+    t0 = time.time()
+    n.tick()
+    assert time.time() - t0 < 0.2
