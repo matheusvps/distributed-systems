@@ -36,6 +36,71 @@ dc() {
   fi
 }
 
+get_committed_index() {
+  local node="${1:-}"
+  local args=(consume)
+  [[ -n "$node" ]] && args+=(--node "$node")
+  local out
+  if ! out=$(docker compose run --rm --no-deps client "${args[@]}" 2>&1); then
+    return 1
+  fi
+  echo "$out" | grep -oE 'committed_index=[0-9]+' | head -1 | cut -d= -f2
+}
+
+get_leader_committed_index() {
+  local max=0 idx
+  for n in 1 2 3; do
+    idx=$(get_committed_index "node${n}:600${n}") || continue
+    if [[ "$idx" -gt "$max" ]]; then
+      max=$idx
+    fi
+  done
+  echo "$max"
+}
+
+publish_and_get_index() {
+  echo -e "${CYAN}\$ docker compose run --rm --no-deps client publish $*${NC}" >&2
+  local out index
+  if ! out=$(docker compose run --rm --no-deps client publish "$@" 2>&1); then
+    echo "$out" >&2
+    echo -e "${YELLOW}AVISO: publish falhou (código $?)${NC}" >&2
+    return 1
+  fi
+  echo "$out" >&2
+  index=$(echo "$out" | grep -oE 'index=[0-9]+' | tail -1 | cut -d= -f2)
+  echo "$index"
+}
+
+wait_for_replica_sync() {
+  local nid="$1"
+  local target="${2:-0}"
+  local timeout="${3:-90}"
+  local addr="node${nid}:600${nid}"
+  local elapsed=0 replica
+
+  if [[ -z "$target" || "$target" -eq 0 ]]; then
+    target=$(get_leader_committed_index)
+  fi
+  if [[ -z "$target" || "$target" -eq 0 ]]; then
+    echo -e "${YELLOW}AVISO: não foi possível determinar índice alvo para sync${NC}" >&2
+    return 1
+  fi
+
+  echo -e "${GREEN}Aguardando node${nid} sincronizar (alvo: committed_index>=${target})...${NC}"
+  while [[ "$elapsed" -lt "$timeout" ]]; do
+    replica=$(get_committed_index "$addr" || true)
+    if [[ -n "$replica" && "$replica" -ge "$target" ]]; then
+      echo -e "${GREEN}node${nid} sincronizado (committed_index=${replica})${NC}"
+      return 0
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+    echo -e "${YELLOW}  ... node${nid} committed_index=${replica:-?}, alvo=${target} (${elapsed}s)${NC}"
+  done
+  echo -e "${YELLOW}AVISO: timeout (${timeout}s) aguardando sync de node${nid}${NC}" >&2
+  return 1
+}
+
 show_persist() {
   local n="${1#node}"
   n="${n%%:*}"
@@ -136,22 +201,27 @@ scenario_4() {
   pause_key
   dc stop node4
 
+  local target_index=0 idx
   step_note "Publicar a=1, b=2, c=3 enquanto node4 está fora"
   pause_key
-  run_client publish a 1
+  idx=$(publish_and_get_index a 1) && [[ -n "$idx" ]] && target_index="$idx"
 
   pause_key
-  run_client publish b 2
+  idx=$(publish_and_get_index b 2) && [[ -n "$idx" ]] && target_index="$idx"
 
   pause_key
-  run_client publish c 3
+  idx=$(publish_and_get_index c 3) && [[ -n "$idx" ]] && target_index="$idx"
 
   step_note "Reiniciar node4 — observe sync incremental nos logs"
   pause_key
   dc start node4
 
+  step_note "Aguardar node4 alcançar o índice do líder (poll automático)"
+  pause_key
+  wait_for_replica_sync 4 "$target_index" 90 || true
+
   step_note "Consumir via node4 (réplica recuperada)"
-  pause_key "Pressione uma tecla após node4 sincronizar nos logs... "
+  pause_key
   run_client consume --node node4:6004
 }
 

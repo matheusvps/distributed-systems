@@ -1,67 +1,87 @@
 # Av5 — Raft com gRPC, Protocol Buffers, Persistência e Recuperação de Falhas
 
-**Disciplina:** Sistemas Distribuídos — Profa. Ana Cristina Barreiras Kochem Vendramin
+**Disciplina:** Sistemas Distribuídos — Profa. Ana Cristina Barreiras Kochem Vendramin  
 **Avaliação 5 (valor 20)**
+
+> **Fonte da verdade:** o enunciado oficial da avaliação (texto da professora).  
+> Este documento é o **design interno** do repositório: descreve como a implementação
+> em `Av5/` atende ao enunciado. Não acrescenta requisitos além dele.
 
 ## Objetivo
 
-Evoluir a implementação do protocolo Raft da Av3 (que usava Pyro5) para uma
-versão baseada em **gRPC + Protocol Buffers**, incorporando **persistência de
-estado**, **recuperação de falhas**, **sincronização incremental de réplicas** e
-**interoperabilidade entre linguagens** (servidores e cliente em linguagens
-diferentes).
+Evoluir a implementação do protocolo Raft da Av3 (Pyro5) para **gRPC + Protocol
+Buffers**, incorporando **persistência**, **recuperação de falhas**,
+**sincronização incremental de réplicas** e **interoperabilidade entre linguagens**.
 
-## Decisões de projeto (confirmadas)
+## Requisitos do enunciado (mapeamento)
+
+| Bloco | Pontos | Critério resumido |
+|-------|--------|-------------------|
+| Cliente externo e descoberta do líder | 3,0 | Cliente em outra linguagem; publish/consume sem saber o líder; redirect via resposta do nó; sem RPCs Raft |
+| Eleição | 2,0 | Seguidor → candidato; um voto/termo; log atualizado; maioria; heartbeats; nova eleição sem heartbeat |
+| Operações de leitura | 3,0 | Leitura no líder e réplicas; distinguir uncommitted vs committed; retornar **só** committed |
+| AppendEntries | 5,0 | Replicação + heartbeat; sync incremental; quórum fixo (4 nós); commit propagado; OK ao cliente após commit |
+| Persistência | 4,0 | termo, índice, último voto, log uncommitted + committed |
+| Recuperação / reintegração | 3,0 | Carregar estado; voltar ao cluster; identificar líder |
+| Demonstração | — | Cenários 1–5 (ver README e `scripts/demo-client.sh`) |
+
+O enunciado **não** exige número de porta, listener único nem topologia Docker
+específica — apenas gRPC, `.proto` e isolamento do cliente em relação ao Raft.
+
+## Decisões de projeto (implementação)
 
 | Item | Decisão |
 |------|---------|
 | Linguagem dos 4 nós Raft | **Python** (evolui a lógica da Av3) |
-| Linguagem do cliente | **Go** (linguagem diferente → demonstra interoperabilidade gRPC) |
-| Transporte | **gRPC** exclusivamente; todas as mensagens via `.proto` |
-| Persistência | **Arquivo JSON por nó** (`data/nodeN.json`), escrita atômica |
-| Execução / demo | **Docker Compose** completo (nós + cliente) |
-| Modelo de aplicação | **Key–value store replicado** (`Publish(key,value)`, `Consume(key)`) |
-| Quórum | **Fixo: 3 de 4** (`4//2 + 1`), independente de nós acessíveis |
-| Descoberta do líder | **Apenas via respostas dos nós** (sem Name Server) |
+| Linguagem do cliente | **Go** |
+| Transporte | **gRPC** exclusivamente; mensagens via `proto/raft.proto` |
+| Isolamento cliente ↔ Raft | Dois **serviços** protobuf (`ClientService` / `RaftService`); cliente só invoca o primeiro |
+| Rede Docker | Duas redes: `client` (cliente Go) e `raft` (nó↔nó) — cliente não alcança `RaftService` |
+| Portas (convenção do repo) | `ClientService` em `nodeN:600N`; `RaftService` em `nodeN-raft:610N` |
+| Servidores gRPC por nó | **Dois** `grpc.server` no mesmo processo (um por serviço/porta) |
+| Persistência | JSON atômico em `data/nodeN/nodeN.json` |
+| Execução / demo | Docker Compose + `scripts/run-scenarios.sh` + `scripts/demo-client.sh` |
+| Modelo de aplicação | Key–value (`Publish`, `Consume`) |
+| Quórum | **Fixo: 3 de 4** (`len(NODE_IDS) // 2 + 1`), independente de nós acessíveis |
+| Descoberta do líder | Apenas `leader_hint` nas respostas (sem Name Server) |
 
 ## Arquitetura
 
 ```
-            ┌─────────── Docker Compose ───────────┐
-            │                                       │
-  Go client │   node1   node2   node3   node4       │
-   (gRPC) ──┼──►(py)    (py)    (py)    (py)         │
-            │     ▲       ▲       ▲       ▲          │
-            │     └───────┴───────┴───────┘          │
-            │         RaftService (interno)          │
-            └───────────────────────────────────────┘
+┌──────────────── Docker Compose ─────────────────────────────────────┐
+│                                                                      │
+│  rede "client"                    rede "raft" (só entre nós)        │
+│  ┌──────────┐                     ┌─────────────────────────────┐   │
+│  │ Go client│──gRPC Publish/Consume│ node1:6001  node1-raft:6101 │   │
+│  │          │    (ClientService)  │ node2:6002  node2-raft:6102 │   │
+│  └──────────┘                     │ node3:6003  node3-raft:6103 │   │
+│       │                           │ node4:6004  node4-raft:6104 │   │
+│       │ (sem rota para 610N)      │      RequestVote /          │   │
+│       │                           │      AppendEntries          │   │
+│       └───────────────────────────┴─────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-Cada nó executa **um único servidor gRPC** que hospeda **dois serviços
-distintos**:
+Cada processo Python hospeda **dois serviços gRPC** definidos no mesmo `.proto`:
 
-1. **`RaftService`** — RPCs internos nó↔nó. O cliente **não** tem acesso.
-   - `RequestVote`
-   - `AppendEntries`
-2. **`ClientService`** — operações da aplicação, expostas ao cliente.
-   - `Publish` (escrita)
-   - `Consume` (leitura)
+1. **`RaftService`** — `RequestVote`, `AppendEntries` (rede `raft` apenas).
+2. **`ClientService`** — `Publish`, `Consume` (rede `client`; único acessível ao Go).
 
-A separação em dois serviços é o mecanismo que garante o requisito *"não será
-permitido ao cliente utilizar chamadas internas do protocolo Raft"*: o cliente
-Go só conhece e só pode invocar `ClientService`.
+Isso atende *"não será permitido ao cliente utilizar chamadas internas do
+protocolo Raft"*: o stub Go só gera cliente para `ClientService`, e a rede
+Docker impede alcançar `610N` mesmo que alguém tentasse.
 
-### Endereçamento
+### Endereçamento (`server/config.py`)
 
-| Nó | Hostname (compose) | Porta gRPC |
-|----|--------------------|------------|
-| 1  | `node1`            | 6001       |
-| 2  | `node2`            | 6002       |
-| 3  | `node3`            | 6003       |
-| 4  | `node4`            | 6004       |
+| Nó | ClientService (cliente) | RaftService (interno) |
+|----|-------------------------|------------------------|
+| 1  | `node1:6001`            | `node1-raft:6101`      |
+| 2  | `node2:6002`            | `node2-raft:6102`      |
+| 3  | `node3:6003`            | `node3-raft:6103`      |
+| 4  | `node4:6004`            | `node4-raft:6104`      |
 
-Ambos os serviços (`RaftService` e `ClientService`) são servidos na **mesma
-porta** de cada nó.
+Aliases de rede definidos em `docker-compose.yml` (`nodeN` na rede `client`,
+`nodeN-raft` na rede `raft`).
 
 ## Definições Protocol Buffers (`proto/raft.proto`)
 
@@ -69,7 +89,6 @@ porta** de cada nó.
 syntax = "proto3";
 package raft;
 
-// ---------- Aplicação (cliente) ----------
 service ClientService {
   rpc Publish (PublishRequest) returns (PublishReply);
   rpc Consume (ConsumeRequest) returns (ConsumeReply);
@@ -77,201 +96,146 @@ service ClientService {
 
 message PublishRequest { string key = 1; string value = 2; }
 message PublishReply {
-  bool   success      = 1;  // true = efetivado (committed) com sucesso
-  string leader_hint  = 2;  // endereço do líder atual se este nó não for líder
-  int64  index        = 3;  // índice atribuído à entrada
-  string message      = 4;  // motivo: "not_leader" | "no_quorum" | "ok"
+  bool   success      = 1;
+  string leader_hint  = 2;
+  int64  index        = 3;
+  string message      = 4;  // "not_leader" | "no_quorum" | "ok"
 }
 
-message ConsumeRequest { string key = 1; }     // key vazia = todos os pares
+message ConsumeRequest { string key = 1; }  // vazio = todos os pares committed
 message ConsumeReply {
-  bool             success     = 1;
-  repeated DataItem items      = 2;  // SOMENTE entradas committed
-  string           leader_hint = 3;
-  bool             is_leader   = 4;  // este nó respondeu como líder?
-  int64            committed_index = 5; // limite de commit deste nó
-  int64            pending_count   = 6; // nº de entradas replicadas porém uncommitted (metadado)
+  bool              success                   = 1;
+  repeated DataItem items                     = 2;  // SOMENTE committed
+  string            leader_hint               = 3;
+  bool              is_leader                 = 4;
+  int64             committed_index           = 5;
+  int64             pending_count             = 6;
+  int64             pending_replicated_count  = 7;
+  int64             pending_leader_only_count = 8;
 }
 message DataItem { string key = 1; string value = 2; int64 index = 3; }
 
-// ---------- Raft (interno) ----------
 service RaftService {
   rpc RequestVote   (RequestVoteArgs)   returns (RequestVoteReply);
   rpc AppendEntries (AppendEntriesArgs) returns (AppendEntriesReply);
 }
 
 message LogEntry { int64 term = 1; int64 index = 2; string key = 3; string value = 4; }
-
-message RequestVoteArgs {
-  int64 term = 1; int32 candidate_id = 2;
-  int64 last_log_index = 3; int64 last_log_term = 4;
-}
-message RequestVoteReply { int64 term = 1; bool vote_granted = 2; }
-
-message AppendEntriesArgs {
-  int64 term = 1; int32 leader_id = 2;
-  int64 prev_log_index = 3; int64 prev_log_term = 4;
-  repeated LogEntry entries = 5;
-  int64 leader_commit = 6;
-}
-message AppendEntriesReply {
-  int64 term = 1;
-  bool  success = 2;
-  int64 conflict_index = 3;  // dica p/ o líder localizar o último trecho consistente
-}
+// ... RequestVote / AppendEntries (incl. conflict_index na rejeição)
 ```
 
-## Descoberta do líder e redirecionamento (cliente Go)
+`pending_*` são **metadados** para o cenário 5: distinguem replicado-uncommitted
+de efetivado sem expor conteúdo uncommitted na lista `items`.
 
-O cliente é configurado com a lista dos 4 endereços, mas **não sabe** quem é o
-líder.
+## Descoberta do líder (cliente Go — `client/discovery.go`)
 
-1. Escolhe um nó (cache do último líder conhecido, senão round-robin) e envia
-   `Publish`/`Consume`.
-2. Se o nó **não** for líder, responde `success=false` + `leader_hint` (o
-   endereço do líder, derivado do estado Raft daquele nó).
-3. O cliente reconecta no `leader_hint` e repete a requisição; passa a usar esse
-   endereço como cache.
-4. Se um nó está inacessível, tenta o próximo da lista.
-5. A identidade do líder vem **exclusivamente** das respostas dos nós (sem Name
-   Server, diferente da Av3).
+1. Lista fixa `node1:6001` … `node4:6004`; não sabe quem é líder.
+2. Tenta um nó (cache do último líder ou round-robin).
+3. Se `not_leader`, usa `leader_hint` e redireciona.
+4. Nó inacessível → próximo da lista.
+5. Líder identificado **somente** pelas respostas dos nós.
 
-## Eleição
+## Eleição (`server/raft_node.py`)
 
-Reaproveita a lógica da Av3, adaptada para gRPC:
+- Seguidor com `election_timeout` aleatório (3,0–6,0 s).
+- Timeout → candidato, `term++`, voto em si, `RequestVote` paralelo.
+- Um voto por termo (`voted_for` persistido).
+- Voto só se log do candidato ≥ local (`last_log_term`, depois `last_log_index`).
+- **≥3 votos** (incluindo o próprio) → líder; heartbeats via `AppendEntries`.
+- Sem heartbeat → nova eleição.
 
-- Cada nó inicia como **seguidor** com `election_timeout` aleatório (faixa, ex.
-  3,0–6,0 s).
-- Timeout expira → vira **candidato**, incrementa `term`, vota em si, chama
-  `RequestVote` nos peers em paralelo.
-- Cada nó vota **uma vez por termo** (`voted_for` persistido).
-- Voto só é concedido se o log do candidato estiver **tão ou mais atualizado**
-  (compara `last_log_term`, depois `last_log_index`).
-- Maioria (**≥3**) → torna-se líder; passa a enviar heartbeats periódicos.
-- Ausência de heartbeat → novo timeout → nova eleição.
+## AppendEntries — heartbeat e replicação
 
-## AppendEntries — Heartbeat e Replicação
+- Por réplica: `next_index`, `match_index`.
+- Envia só `log[next_index:]` — **nunca** a base inteira.
+- Heartbeat = `AppendEntries` vazio ou com entradas pendentes.
+- Rejeição se `prev_log_index`/`prev_log_term` inconsistentes + `conflict_index`.
+- Commit se `match_index ≥ N` em **≥3 nós** e `log[N].term == current_term`.
+- Quórum sempre sobre **4 nós**; não reduz por falha.
+- Sem quórum: `no_quorum` / pendente.
+- `leader_commit` propagado em todo `AppendEntries`; seguidores aplicam até
+  `min(leader_commit, last_log_index)`.
+- Sucesso ao cliente (`success=true`) só após commit.
 
-- Líder mantém, por réplica, **`next_index`** e **`match_index`**.
-- `AppendEntries` envia apenas `log[next_index:]` daquela réplica — **nunca a
-  base inteira**. Heartbeat é o mesmo RPC; se a réplica está atrasada, o
-  "heartbeat" já carrega as entradas que faltam → réplica recupera mesmo **sem
-  novas escritas**.
-- Réplica rejeita (`success=false`) quando `prev_log_index`/`prev_log_term` não
-  batem com seu log local, retornando **`conflict_index`** para o líder
-  retroceder e reenviar **apenas** o trecho ausente.
-- Heartbeats sempre recebem resposta das réplicas.
-- **Quórum fixo:** uma entrada `N` é efetivada (committed) somente quando
-  `match_index ≥ N` em **≥3 nós** (incluindo o líder) **e** `log[N].term ==
-  current_term`. Nunca reduz o quórum por indisponibilidade.
-- Sem quórum → escrita **rejeitada ou pendente** até restabelecer.
-- Após efetivar, líder avança `commit_index`, **aplica** a entrada, responde ao
-  cliente `success=true`, e propaga `commit_index` via `leader_commit` nas
-  próximas mensagens AppendEntries (inclusive heartbeats).
-- Seguidores só aplicam/disponibilizam entradas até `min(leader_commit,
-  últimoÍndiceLocal)`.
+## Operações de leitura (`Consume`)
 
-## Operações de Leitura (`Consume`)
+- Atendida no líder e nas réplicas (`--node nodeX:600X`).
+- `items`: apenas `index ≤ commit_index`.
+- Metadados `committed_index`, `pending_count` (+ breakdown no líder).
 
-- Atendida pelo **líder** e pelas **réplicas**.
-- Retorna **somente** entradas com `index ≤ commit_index` (committed).
-- `ConsumeReply` inclui `committed_index` e `pending_count` (nº de entradas
-  replicadas porém uncommitted) como **metadados** para evidenciar a distinção
-  entre *replicado-uncommitted* e *efetivado* — sem expor o conteúdo
-  uncommitted.
-- Como as réplicas só avançam `commit_index` via `leader_commit`, elas só
-  expõem dados efetivamente confirmados.
+## Persistência (`server/persistence.py`)
 
-## Persistência de Estado
-
-Arquivo JSON por nó (`data/nodeN.json`), escrita **atômica** (arquivo temporário
-+ `rename`):
+Arquivo `data/nodeN/nodeN.json`, escrita atômica (temp + `os.replace`):
 
 ```json
 {
-  "current_term": 0,
+  "current_term": 2,
   "voted_for": null,
-  "commit_index": 1,
+  "commit_index": 3,
   "log": [
-    { "term": 1, "index": 1, "key": "x", "value": "1" }
+    { "term": 1, "index": 1, "key": "cidade", "value": "curitiba" }
   ]
 }
 ```
 
-Contém, no mínimo:
-- **termo corrente** e **índice corrente** (derivado do log / `commit_index`);
-- **ID do último voto** (`voted_for`);
-- **dados intermediários (uncommitted)** — entradas com `index > commit_index`;
-- **dados finais (committed)** — entradas com `index ≤ commit_index`.
+Persiste: termo, `voted_for`, log completo (uncommitted + committed), `commit_index`.
 
-Persiste a cada mudança de: termo, voto, append/truncamento de log, avanço de
-commit. `commit_index` é persistido porque o enunciado exige persistir dados
-committed (vai além do Raft canônico, que persiste apenas term/votedFor/log).
+## Recuperação e reintegração
 
-## Recuperação de Nós e Reintegração
-
-Ao reiniciar após falha/desligamento, o nó:
-1. **Carrega** `data/nodeN.json` (se existir) e restaura `current_term`,
-   `voted_for`, `log`, `commit_index`.
-2. Inicia como **seguidor**.
-3. **Identifica o líder corrente** ao receber o primeiro `AppendEntries`
-   (heartbeat) e passa a participar normalmente.
-4. Se estiver atrasado, o líder o detecta via `next_index`/`conflict_index` e o
-   sincroniza **incrementalmente**.
+1. `load_state` no `RaftNode.__init__`.
+2. Inicia como seguidor.
+3. Identifica líder no primeiro `AppendEntries`.
+4. Sync incremental via `next_index` / `conflict_index` (cenário 4).
 
 ## Modelo de concorrência (servidor Python)
 
-- `grpc.server` com `ThreadPoolExecutor`.
-- Uma thread de **ticker** em background: trata timeout de eleição (seguidor/
-  candidato) e envio de heartbeats (líder).
-- `threading.RLock` protege o estado compartilhado (espelha a Av3).
+- Dois `grpc.server` com `ThreadPoolExecutor` (`server/server.py`).
+- Thread **ticker** (`run_ticker`): eleição e agendamento de heartbeats/replicação.
+- Pool de workers para RPCs Raft lentos (não bloquear o ticker).
+- `threading.RLock` no estado compartilhado.
 
 ## Estrutura do repositório
 
 ```
 Av5/
-  proto/
-    raft.proto
-  server/                  # Python (4 nós)
-    raft_node.py           # máquina de estados Raft
-    server.py              # servidor gRPC: RaftService + ClientService
-    persistence.py         # load/save JSON atômico
-    config.py              # mapa node_id -> host:porta, timeouts
-    run_node.py            # entrypoint (--id)
-    gen/                   # stubs gerados do .proto (committed)
-    requirements.txt
-    Dockerfile
-  client/                  # Go (cliente)
-    main.go                # CLI: publish / consume / interativo
-    discovery.go           # descoberta de líder + retry/redirect
-    gen/                   # stubs gerados do .proto (committed)
-    go.mod / go.sum
-    Dockerfile
+  proto/raft.proto
+  server/
+    raft_node.py       # máquina de estados Raft (sem import grpc)
+    server.py          # dois servidores gRPC + servicers
+    transport.py       # GrpcPeers (rede raft)
+    persistence.py
+    config.py
+    run_node.py
+    gen/
+    tests/
+  client/
+    main.go
+    discovery.go
+    gen/
   scripts/
-    gen-proto.sh           # regenera stubs Python e Go
+    gen-proto.sh
+    run-scenarios.sh   # sobe cluster + janelas logs/cliente
+    demo-client.sh     # cenários 1–5 interativos
+    run-tests.sh
   docker-compose.yml
-  README.md                # os 5 cenários de demonstração, passo a passo
+  README.md
 ```
 
-Os stubs gerados são **committed** no repositório para garantir build/demo
-confiáveis; `scripts/gen-proto.sh` permite regenerá-los.
+## Cenários de demonstração
 
-## Cenários de demonstração (cobertos pelo README)
+| # | Enunciado | Automação |
+|---|-----------|-----------|
+| 1 | Operação normal | `demo-client.sh` scenario_1 |
+| 2 | Falha do líder | scenario_2 |
+| 3 | Persistência | scenario_3 + `data/nodeN/nodeN.json` |
+| 4 | Recuperação de réplica | scenario_4 + poll até `committed_index` alinhar |
+| 5 | Consistência de leitura | scenario_5 |
 
-1. **Operação Normal** — sobe 4 nós → eleição → `Publish` → replicação →
-   `Consume`.
-2. **Falha do Líder** — `stop` no líder → nova eleição → continuidade de
-   publish/consume.
-3. **Persistência** — `stop` em um nó → restart → recupera estado persistido.
-4. **Recuperação de Réplica** — `stop` em réplica → novas escritas → restart →
-   sincronização **apenas das entradas ausentes** (verificável nos logs do
-   líder via `next_index`/`conflict_index`).
-5. **Consistência de Leitura** — `Consume` no líder e em réplicas → apenas dados
-   committed retornados; `pending_count` evidencia entradas uncommitted.
+`run-scenarios.sh` pergunta se deseja limpar `data/` antes de subir os nós.
 
-## Fora de escopo (YAGNI)
+## Fora de escopo
 
 - Snapshotting / compactação de log.
-- Mudança dinâmica de membros do cluster (cluster fixo de 4).
-- TLS/autenticação entre nós.
-- Reordenação/otimização do conteúdo do `Consume` além de chave única.
+- Membros dinâmicos (cluster fixo de 4).
+- TLS/autenticação.
+- Name Server / descoberta fora das respostas gRPC.

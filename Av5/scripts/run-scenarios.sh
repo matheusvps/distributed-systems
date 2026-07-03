@@ -16,6 +16,9 @@ uso: $(basename "$0") [opções]
   --startup SECONDS  pausa após 'up' antes de abrir janelas (padrão: $STARTUP_DELAY)
   -h, --help         esta ajuda
 
+Antes de subir os nós, pergunta se deseja limpar data/ (persistência de execuções
+anteriores). Em stdin não interativo, mantém data/ sem perguntar.
+
 Abre duas janelas de terminal logo após subir os nós:
   1) logs dos 4 nós (docker compose logs -f) — acompanhe a eleição aqui
   2) driver interativo dos cenários 1–5 + modo livre
@@ -57,9 +60,42 @@ open_terminal() {
   fi
 }
 
+prepare_data_dirs() {
+  mkdir -p data/node{1,2,3,4}
+}
+
+maybe_clear_data() {
+  if [[ ! -t 0 ]]; then
+    echo "==> stdin não interativo — mantendo data/ existente"
+    prepare_data_dirs
+    return
+  fi
+
+  echo
+  if [[ -d data ]] && [[ -n "$(ls -A data 2>/dev/null)" ]]; then
+    echo "Há dados persistidos em data/ (ex.: nodeN/nodeN.json de execuções anteriores)."
+  else
+    echo "Pasta data/ vazia ou inexistente."
+  fi
+  local answer
+  read -r -p "Limpar data/ antes de subir os nós? [s/N] " answer
+  case "${answer,,}" in
+    s|sim|y|yes)
+      echo "==> Limpando persistência (docker compose down + rm -rf data/)"
+      docker compose down 2>/dev/null || true
+      rm -rf data/
+      prepare_data_dirs
+      ;;
+    *)
+      echo "==> Mantendo data/ existente"
+      prepare_data_dirs
+      ;;
+  esac
+}
+
 echo "==> Preparando ambiente em $ROOT"
-mkdir -p data/node{1,2,3,4}
 printf 'HOST_UID=%s\nHOST_GID=%s\n' "$(id -u)" "$(id -g)" > .env
+maybe_clear_data
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
   echo "==> docker compose build"
