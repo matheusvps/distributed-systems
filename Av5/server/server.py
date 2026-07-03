@@ -57,12 +57,20 @@ def serve(node_id):
     ticker = threading.Thread(target=node.run_ticker, daemon=True)
     ticker.start()
 
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    raft_pb2_grpc.add_RaftServiceServicer_to_server(RaftServicer(node), server)
-    raft_pb2_grpc.add_ClientServiceServicer_to_server(ClientServicer(node), server)
+    raft_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    raft_pb2_grpc.add_RaftServiceServicer_to_server(RaftServicer(node), raft_server)
+    raft_port = config.RAFT_NODE_ADDRESSES[node_id].split(":")[1]
+    raft_server.add_insecure_port(f"[::]:{raft_port}")
+    raft_server.start()
 
-    port = config.NODE_ADDRESSES[node_id].split(":")[1]
-    server.add_insecure_port(f"[::]:{port}")
-    server.start()
-    node.log_event(f"servidor gRPC ouvindo na porta {port}")
-    server.wait_for_termination()
+    client_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    raft_pb2_grpc.add_ClientServiceServicer_to_server(ClientServicer(node), client_server)
+    client_port = config.CLIENT_NODE_ADDRESSES[node_id].split(":")[1]
+    client_server.add_insecure_port(f"[::]:{client_port}")
+    client_server.start()
+
+    node.log_event(f"RaftService interno em {config.RAFT_NODE_ADDRESSES[node_id]}")
+    node.log_event(f"ClientService em {config.CLIENT_NODE_ADDRESSES[node_id]}")
+
+    threading.Thread(target=raft_server.wait_for_termination, daemon=True).start()
+    client_server.wait_for_termination()

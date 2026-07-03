@@ -234,8 +234,8 @@ class RaftNode:
         self._advance_commit_index()
 
     def _leader_hint(self):
-        if self.leader_id and self.leader_id in config.NODE_ADDRESSES:
-            return config.NODE_ADDRESSES[self.leader_id]
+        if self.leader_id and self.leader_id in config.CLIENT_NODE_ADDRESSES:
+            return config.CLIENT_NODE_ADDRESSES[self.leader_id]
         return ""
 
     def handle_publish(self, key, value):

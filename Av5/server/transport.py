@@ -19,7 +19,7 @@ class GrpcPeers:
         self.node_id = node_id
         self._channels = {}
         for pid in config.peer_ids(node_id):
-            self._channels[pid] = grpc.insecure_channel(config.NODE_ADDRESSES[pid])
+            self._channels[pid] = grpc.insecure_channel(config.RAFT_NODE_ADDRESSES[pid])
 
     def _stub(self, peer_id):
         return raft_pb2_grpc.RaftServiceStub(self._channels[peer_id])

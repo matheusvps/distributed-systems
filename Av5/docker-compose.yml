@@ -5,7 +5,9 @@ services:
     command: ["--id", "1"]
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     restart: unless-stopped
-    networks: [raft]
+    networks:
+      raft: { aliases: [node1-raft] }
+      client: { aliases: [node1] }
     volumes: ["./data/node1:/app/data"]
   node2:
     build: { context: ., dockerfile: server/Dockerfile }
@@ -13,7 +15,9 @@ services:
     command: ["--id", "2"]
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     restart: unless-stopped
-    networks: [raft]
+    networks:
+      raft: { aliases: [node2-raft] }
+      client: { aliases: [node2] }
     volumes: ["./data/node2:/app/data"]
   node3:
     build: { context: ., dockerfile: server/Dockerfile }
@@ -21,7 +25,9 @@ services:
     command: ["--id", "3"]
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     restart: unless-stopped
-    networks: [raft]
+    networks:
+      raft: { aliases: [node3-raft] }
+      client: { aliases: [node3] }
     volumes: ["./data/node3:/app/data"]
   node4:
     build: { context: ., dockerfile: server/Dockerfile }
@@ -29,15 +35,19 @@ services:
     command: ["--id", "4"]
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     restart: unless-stopped
-    networks: [raft]
+    networks:
+      raft: { aliases: [node4-raft] }
+      client: { aliases: [node4] }
     volumes: ["./data/node4:/app/data"]
   client:
     build: { context: ., dockerfile: client/Dockerfile }
     container_name: av5-client
     profiles: ["client"]
-    networks: [raft]
+    networks: [client]
     depends_on: [node1, node2, node3, node4]
 
 networks:
   raft:
+    driver: bridge
+  client:
     driver: bridge

@@ -1,11 +1,21 @@
 import os
 
 NODE_IDS = [1, 2, 3, 4]
-NODE_ADDRESSES = {
+
+# Client-facing API (Publish/Consume) — reachable by the Go client.
+CLIENT_NODE_ADDRESSES = {
     1: "node1:6001",
     2: "node2:6002",
     3: "node3:6003",
     4: "node4:6004",
+}
+
+# Internal Raft RPCs (RequestVote/AppendEntries) — cluster network only.
+RAFT_NODE_ADDRESSES = {
+    1: "node1-raft:6101",
+    2: "node2-raft:6102",
+    3: "node3-raft:6103",
+    4: "node4-raft:6104",
 }
 QUORUM = len(NODE_IDS) // 2 + 1 
 

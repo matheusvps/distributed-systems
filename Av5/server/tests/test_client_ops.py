@@ -31,7 +31,7 @@ def test_non_leader_publish_returns_hint(tmp_path):
     reply = n.handle_publish("a", "1")
     assert reply["success"] is False
     assert reply["message"] == "not_leader"
-    assert reply["leader_hint"] == config.NODE_ADDRESSES[3]
+    assert reply["leader_hint"] == config.CLIENT_NODE_ADDRESSES[3]
 
 def test_leader_publish_commits_with_quorum(tmp_path):
     n = leader(tmp_path, AllAckTransport())

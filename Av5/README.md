@@ -10,11 +10,12 @@ Matheus Vinicius Passos de Santana
 
 ## Arquitetura
 
-- 4 nós Raft em **Python** (`node1`..`node4`), portas `6001`..`6004`.
+- 4 nós Raft em **Python** (`node1`..`node4`).
+- **Duas portas por nó** (dois servidores gRPC separados):
+  - `ClientService` em `nodeN:600N` — rede `client` (única acessível ao cliente Go).
+  - `RaftService` em `nodeN-raft:610N` — rede `raft` (somente entre nós).
 - Cliente em **Go** (linguagem diferente → interoperabilidade gRPC).
-- Dois serviços gRPC por nó:
-  - `RaftService` (interno): `RequestVote`, `AppendEntries`.
-  - `ClientService` (externo, único acessível ao cliente): `Publish`, `Consume`.
+- O cliente **não** alcança a rede `raft`; portanto não pode invocar `RequestVote`/`AppendEntries`.
 - Quórum **fixo = 3** (de 4), nunca reduzido por indisponibilidade.
 - Descoberta do líder **apenas** via `leader_hint` nas respostas (sem Name Server).
 - Persistência por nó em `data/nodeN/node{id}.json` (term, voted_for, log
