@@ -47,6 +47,7 @@ services:
     # sem depends_on: evita que 'docker compose run client' reinicie nós parados (cenário 4)
 
 networks:
+  # Portas 6001–6004 e 6101–6104 NÃO são publicadas no host — só na rede Docker.
   raft:
     driver: bridge
   client:

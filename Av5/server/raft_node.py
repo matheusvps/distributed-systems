@@ -33,8 +33,11 @@ class RaftNode:
         self.publish_commit_timeout = 3.0  # max seconds to wait for commit in handle_publish
         self._election_in_progress = False
         self._replication_in_progress = False
+        peer_count = len(config.peer_ids(node_id))
         self._workers = concurrent.futures.ThreadPoolExecutor(
             max_workers=2, thread_name_prefix=f"raft-{node_id}")
+        self._replicate_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=peer_count, thread_name_prefix=f"raft-repl-{node_id}")
         self._reset_election_deadline()
 
     def log_event(self, msg, peer_id=None):
@@ -228,10 +231,13 @@ class RaftNode:
 
     def replicate_to_all(self):
         peers = config.peer_ids(self.node_id)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(peers)) as ex:
-            futures = [ex.submit(self._replicate_to_peer, pid) for pid in peers]
-            concurrent.futures.wait(futures)
+        futures = [self._replicate_pool.submit(self._replicate_to_peer, pid) for pid in peers]
+        concurrent.futures.wait(futures)
         self._advance_commit_index()
+
+    def _schedule_replication(self):
+        """Enqueue replication without blocking the caller (used by publish)."""
+        self._workers.submit(self.replicate_to_all)
 
     def _leader_hint(self):
         if self.leader_id and self.leader_id in config.CLIENT_NODE_ADDRESSES:
@@ -249,7 +255,7 @@ class RaftNode:
             self._persist()
             self.log_event(f"<- client publish {key}={value} (index={index})")
 
-        self.replicate_to_all()
+        self._schedule_replication()
 
         deadline = time.time() + self.publish_commit_timeout
         poll_interval = 0.1
@@ -261,6 +267,7 @@ class RaftNode:
                         "index": index, "message": "ok"}
             if time.time() >= deadline:
                 break
+            self._schedule_replication()
             time.sleep(poll_interval)
 
         return {"success": False, "leader_hint": "",
