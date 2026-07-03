@@ -44,7 +44,7 @@ services:
     container_name: av5-client
     profiles: ["client"]
     networks: [client]
-    depends_on: [node1, node2, node3, node4]
+    # sem depends_on: evita que 'docker compose run client' reinicie nós parados (cenário 4)
 
 networks:
   raft:

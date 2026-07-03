@@ -46,6 +46,25 @@ pip install -r server/requirements.txt
 python -m pytest server/tests -v
 ```
 
+## Demonstração interativa (cenários 1–5)
+
+Script que sobe o cluster, abre **duas janelas** (logs dos nós + cliente interativo)
+e guia os cenários passo a passo — pressione uma tecla entre cada comando.
+Ao final dos 5 cenários, o modo livre aceita comandos customizados (`publish`, `consume`,
+`stop`/`start` de nós, etc.).
+
+```bash
+cd Av5
+./scripts/run-scenarios.sh
+# opções: --skip-build   --startup 3
+```
+
+A janela do cliente também pode ser executada sozinha (com o cluster já no ar):
+
+```bash
+./scripts/demo-client.sh
+```
+
 ---
 
 ## Cenário 1 — Operação Normal
@@ -58,14 +77,14 @@ docker compose up -d node1 node2 node3 node4
 docker compose logs -f node1 node2 node3 node4   # procure "eleito LIDER"
 
 # 3. publicação de dados pelo cliente
-docker compose run --rm client publish cidade curitiba
-docker compose run --rm client publish estado parana
+docker compose run --rm --no-deps client publish cidade curitiba
+docker compose run --rm --no-deps client publish estado parana
 
 # 4. replicação: observe nos logs dos nós "OK replicado ate index=..."
 
 # 5. consumo
-docker compose run --rm client consume          # lista todos os pares committed
-docker compose run --rm client consume cidade
+docker compose run --rm --no-deps client consume          # lista todos os pares committed
+docker compose run --rm --no-deps client consume cidade
 ```
 
 ## Cenário 2 — Falha do Líder
@@ -78,8 +97,8 @@ docker compose stop node2
 docker compose logs -f node1 node3 node4         # novo "eleito LIDER"
 
 # operações continuam (cliente redireciona sozinho para o novo líder)
-docker compose run --rm client publish pais brasil
-docker compose run --rm client consume pais
+docker compose run --rm --no-deps client publish pais brasil
+docker compose run --rm --no-deps client consume pais
 ```
 
 ## Cenário 3 — Persistência
@@ -100,13 +119,14 @@ cat data/node3/node3.json                        # estado persistido em disco
 ## Cenário 4 — Recuperação de Réplica (sync incremental)
 
 ```bash
-# interrompe uma réplica (não-líder)
+# interrompe uma réplica (não-líder; se node4 for líder, pare outro nó)
 docker compose stop node4
 
 # novas operações enquanto node4 está fora
-docker compose run --rm client publish a 1
-docker compose run --rm client publish b 2
-docker compose run --rm client publish c 3
+# (--no-deps evita que o client suba node4 de volta)
+docker compose run --rm --no-deps client publish a 1
+docker compose run --rm --no-deps client publish b 2
+docker compose run --rm --no-deps client publish c 3
 
 # reinicia a réplica
 docker compose start node4
@@ -115,16 +135,16 @@ docker compose start node4
 # observe nos logs do líder o avanço de next_index para node4 e em node4 o
 # "OK replicado ate index=..." — sem reenvio integral da base.
 docker compose logs -f node4
-docker compose run --rm client consume --node node4:6004   # node4 já consistente
+docker compose run --rm --no-deps client consume --node node4:6004   # node4 já consistente
 ```
 
 ## Cenário 5 — Consistência de Leitura
 
 ```bash
 # leitura no líder e em réplicas: apenas dados committed são retornados
-docker compose run --rm client consume --node node1:6001
-docker compose run --rm client consume --node node2:6002
-docker compose run --rm client consume --node node3:6003
+docker compose run --rm --no-deps client consume --node node1:6001
+docker compose run --rm --no-deps client consume --node node2:6002
+docker compose run --rm --no-deps client consume --node node3:6003
 
 # cada resposta mostra committed_index e pending(uncommitted)=N,
 # com breakdown replicadas=... / so_lider=... (no líder) ou replicadas=N (na réplica).
