@@ -32,4 +32,5 @@ def peer_ids(node_id):
 
 
 def data_path(node_id):
-    return os.path.join(DATA_DIR, f"node{node_id}.json")
+    # data/nodeN/nodeN.json — mesmo layout local e no Docker (RAFT_DATA_DIR=/app/data, volume ./data)
+    return os.path.join(DATA_DIR, f"node{node_id}", f"node{node_id}.json")

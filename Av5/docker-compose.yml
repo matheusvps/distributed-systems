@@ -8,7 +8,7 @@ services:
     networks:
       raft: { aliases: [node1-raft] }
       client: { aliases: [node1] }
-    volumes: ["./data/node1:/app/data"]
+    volumes: ["./data:/app/data"]
   node2:
     build: { context: ., dockerfile: server/Dockerfile }
     container_name: av5-node2
@@ -18,7 +18,7 @@ services:
     networks:
       raft: { aliases: [node2-raft] }
       client: { aliases: [node2] }
-    volumes: ["./data/node2:/app/data"]
+    volumes: ["./data:/app/data"]
   node3:
     build: { context: ., dockerfile: server/Dockerfile }
     container_name: av5-node3
@@ -28,7 +28,7 @@ services:
     networks:
       raft: { aliases: [node3-raft] }
       client: { aliases: [node3] }
-    volumes: ["./data/node3:/app/data"]
+    volumes: ["./data:/app/data"]
   node4:
     build: { context: ., dockerfile: server/Dockerfile }
     container_name: av5-node4
@@ -38,7 +38,7 @@ services:
     networks:
       raft: { aliases: [node4-raft] }
       client: { aliases: [node4] }
-    volumes: ["./data/node4:/app/data"]
+    volumes: ["./data:/app/data"]
   client:
     build: { context: ., dockerfile: client/Dockerfile }
     container_name: av5-client

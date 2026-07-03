@@ -1,4 +1,5 @@
 from server import config
+import os
 
 def test_quorum_is_fixed_three():
     assert config.QUORUM == 3
@@ -14,4 +15,4 @@ def test_peer_ids_excludes_self():
     assert config.peer_ids(2) == [1, 3, 4]
 
 def test_data_path_uses_node_id():
-    assert config.data_path(3).endswith("node3.json")
+    assert config.data_path(3) == os.path.join(config.DATA_DIR, "node3", "node3.json")

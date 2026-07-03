@@ -1,4 +1,5 @@
 from server.persistence import PersistentState, save_state, load_state
+import json
 
 def test_load_missing_returns_defaults(tmp_path):
     state = load_state(str(tmp_path / "node9.json"))
@@ -35,3 +36,37 @@ def test_save_creates_parent_dir(tmp_path):
     path = str(tmp_path / "data" / "node2.json")
     save_state(path, PersistentState(current_term=2))
     assert load_state(path).current_term == 2
+
+def test_load_invalid_json_returns_defaults_and_backups(tmp_path, capsys):
+    path = tmp_path / "node1.json"
+    path.write_text("{ not valid json", encoding="utf-8")
+    state = load_state(str(path))
+    assert state == PersistentState()
+    assert not path.exists()
+    assert (tmp_path / "node1.json.corrupt.bak").exists()
+    assert "AVISO" in capsys.readouterr().out
+
+def test_load_invalid_top_level_returns_defaults(tmp_path, capsys):
+    path = tmp_path / "node1.json"
+    path.write_text('"just a string"', encoding="utf-8")
+    state = load_state(str(path))
+    assert state == PersistentState()
+    assert (tmp_path / "node1.json.corrupt.bak").exists()
+
+def test_load_sanitizes_bad_log_entries(tmp_path):
+    path = tmp_path / "node1.json"
+    path.write_text(json.dumps({
+        "current_term": 3,
+        "voted_for": 2,
+        "commit_index": 99,
+        "log": [
+            {"term": 1, "index": 1, "key": "a", "value": "1"},
+            {"term": "x", "index": 2, "key": "b", "value": "2"},
+            {"term": 1, "index": 3, "key": "c", "value": "3"},
+        ],
+    }), encoding="utf-8")
+    state = load_state(str(path))
+    assert state.current_term == 3
+    assert state.voted_for == 2
+    assert state.log == [{"term": 1, "index": 1, "key": "a", "value": "1"}]
+    assert state.commit_index == 1

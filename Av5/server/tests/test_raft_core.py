@@ -35,6 +35,15 @@ def test_loads_persisted_state(tmp_path):
     assert n.last_log_term() == 7
     assert n.state == "Seguidor"  # always recovers as follower
 
+def test_starts_with_corrupt_persisted_file(tmp_path, capsys):
+    path = tmp_path / "node1.json"
+    path.write_text("<<<corrupt>>>", encoding="utf-8")
+    n = make_node(tmp_path)
+    assert n.current_term == 0
+    assert n.log == []
+    assert n.state == "Seguidor"
+    assert "AVISO" in capsys.readouterr().out
+
 def test_last_log_info_empty(tmp_path):
     n = make_node(tmp_path)
     assert n.last_log_index() == 0
