@@ -59,7 +59,33 @@ def test_consume_returns_only_committed(tmp_path):
     keys = {it["key"] for it in reply["items"]}
     assert keys == {"a"}            # b is uncommitted, hidden
     assert reply["pending_count"] == 1
+    assert reply["pending_replicated_count"] == 0
+    assert reply["pending_leader_only_count"] == 1
     assert reply["committed_index"] == 1
+
+def test_consume_pending_replicated_on_leader(tmp_path):
+    n = leader(tmp_path, AllAckTransport())
+    n.handle_publish("a", "1")
+    n.log.append({"term": 1, "index": 2, "key": "b", "value": "2"})
+    n.match_index[2] = 2
+    reply = n.handle_consume("")
+    assert reply["pending_count"] == 1
+    assert reply["pending_replicated_count"] == 1
+    assert reply["pending_leader_only_count"] == 0
+
+def test_consume_pending_on_follower_is_replicated(tmp_path):
+    n = RaftNode(2, NoAckTransport(), data_path=str(tmp_path / "node2.json"))
+    n.state = "Seguidor"
+    n.leader_id = 1
+    n.log = [
+        {"term": 1, "index": 1, "key": "a", "value": "1"},
+        {"term": 1, "index": 2, "key": "b", "value": "2"},
+    ]
+    n.commit_index = 1
+    reply = n.handle_consume("")
+    assert reply["pending_count"] == 1
+    assert reply["pending_replicated_count"] == 1
+    assert reply["pending_leader_only_count"] == 0
 
 def test_consume_single_key_latest_value(tmp_path):
     n = leader(tmp_path, AllAckTransport())

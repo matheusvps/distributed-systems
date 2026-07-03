@@ -17,12 +17,14 @@ message PublishReply {
 
 message ConsumeRequest { string key = 1; }
 message ConsumeReply {
-  bool              success         = 1;
-  repeated DataItem items           = 2;
-  string            leader_hint     = 3;
-  bool              is_leader       = 4;
-  int64             committed_index = 5;
-  int64             pending_count   = 6;
+  bool              success                   = 1;
+  repeated DataItem items                     = 2;
+  string            leader_hint               = 3;
+  bool              is_leader                 = 4;
+  int64             committed_index           = 5;
+  int64             pending_count             = 6;  // total uncommitted (replicated + leader_only)
+  int64             pending_replicated_count  = 7;  // uncommitted, present on >=1 replica
+  int64             pending_leader_only_count = 8;  // uncommitted, only on leader (leader view)
 }
 message DataItem { string key = 1; string value = 2; int64 index = 3; }
 

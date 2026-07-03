@@ -262,10 +262,32 @@ class RaftNode:
         return {"success": False, "leader_hint": "",
                 "index": index, "message": "no_quorum"}
 
+    def _pending_breakdown(self):
+        """Classify uncommitted entries: replicated to a replica vs leader-only."""
+        uncommitted = self.log[self.commit_index:]
+        total = len(uncommitted)
+        if total == 0:
+            return 0, 0, 0
+
+        if self.state != "Lider":
+            # Follower: local uncommitted entries were received via AppendEntries.
+            return total, total, 0
+
+        replicated = 0
+        leader_only = 0
+        peers = config.peer_ids(self.node_id)
+        for e in uncommitted:
+            idx = e["index"]
+            if any(self.match_index.get(pid, 0) >= idx for pid in peers):
+                replicated += 1
+            else:
+                leader_only += 1
+        return total, replicated, leader_only
+
     def handle_consume(self, key):
         with self.lock:
             committed = self.log[: self.commit_index]
-            pending = len(self.log) - self.commit_index
+            pending, pending_replicated, pending_leader_only = self._pending_breakdown()
             latest = {}
             order = []
             for e in committed:
@@ -284,6 +306,8 @@ class RaftNode:
                 "is_leader": self.state == "Lider",
                 "committed_index": self.commit_index,
                 "pending_count": pending,
+                "pending_replicated_count": pending_replicated,
+                "pending_leader_only_count": pending_leader_only,
             }
 
     def start_election(self):

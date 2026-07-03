@@ -24,8 +24,9 @@ func doConsume(c *Cluster, key, node string) {
 	if reply.IsLeader {
 		src = "lider"
 	}
-	fmt.Printf("[%s] committed_index=%d pending(uncommitted)=%d\n",
-		src, reply.CommittedIndex, reply.PendingCount)
+	fmt.Printf("[%s] committed_index=%d pending(uncommitted)=%d (replicadas=%d, so_lider=%d)\n",
+		src, reply.CommittedIndex, reply.PendingCount,
+		reply.PendingReplicatedCount, reply.PendingLeaderOnlyCount)
 	if len(reply.Items) == 0 {
 		fmt.Println("  (sem dados efetivados)")
 	}

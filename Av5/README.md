@@ -125,7 +125,8 @@ docker compose run --rm client consume --node node1:6001
 docker compose run --rm client consume --node node2:6002
 docker compose run --rm client consume --node node3:6003
 
-# cada resposta mostra committed_index e pending(uncommitted)=N.
+# cada resposta mostra committed_index e pending(uncommitted)=N,
+# com breakdown replicadas=... / so_lider=... (no líder) ou replicadas=N (na réplica).
 # Entradas uncommitted NUNCA aparecem na lista de itens — só as efetivadas.
 ```
 

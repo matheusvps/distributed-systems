@@ -45,7 +45,9 @@ class ClientServicer(raft_pb2_grpc.ClientServiceServicer):
             items=[raft_pb2.DataItem(key=i["key"], value=i["value"], index=i["index"])
                    for i in r["items"]],
             leader_hint=r["leader_hint"], is_leader=r["is_leader"],
-            committed_index=r["committed_index"], pending_count=r["pending_count"])
+            committed_index=r["committed_index"], pending_count=r["pending_count"],
+            pending_replicated_count=r["pending_replicated_count"],
+            pending_leader_only_count=r["pending_leader_only_count"])
 
 
 def serve(node_id):
