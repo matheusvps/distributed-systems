@@ -4,7 +4,9 @@ Consenso Raft em **4 nós Python** (gRPC) com **cliente Go** (interoperabilidade
 persistência em disco, recuperação de falhas e sincronização incremental de
 réplicas.
 
-Alunos: <preencher>
+Alunos:
+Lucas Yukio Fukuda Matsumoto
+Matheus Vinicius Passos de Santana
 
 ## Arquitetura
 
@@ -27,6 +29,9 @@ o cliente é compilado dentro do container.)
 
 ```bash
 cd Av5
+# Pastas de persistência com dono do usuário local (evita data/ root-owned após o 1º up)
+mkdir -p data/node{1,2,3,4}
+printf 'HOST_UID=%s\nHOST_GID=%s\n' "$(id -u)" "$(id -g)" > .env
 docker compose build
 ```
 
@@ -131,6 +136,10 @@ docker compose down
 # para limpar o estado persistido:
 rm -rf data/
 ```
+
+Se `rm -rf data/` falhar com “Permission denied”, a pasta foi criada como `root` num run
+anterior (container sem `user:`). Corrija uma vez com `sudo chown -R "$(id -u):$(id -g)" data/`
+ou use o `.env` com `HOST_UID`/`HOST_GID` antes do próximo `docker compose up`.
 
 ## Mapa de requisitos → implementação
 

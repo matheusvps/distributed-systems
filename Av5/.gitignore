@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
 data/
+.env
 client/gen/
 .pytest_cache/
