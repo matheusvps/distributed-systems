@@ -14,7 +14,7 @@ Matheus Vinicius Passos de Santana
 - **Duas portas por nó** (dois servidores gRPC separados):
   - `ClientService` em `nodeN:600N` — rede `client` (única acessível ao cliente Go).
   - `RaftService` em `nodeN-raft:610N` — rede `raft` (somente entre nós).
-- Cliente em **Go** (linguagem diferente → interoperabilidade gRPC).
+- Cliente em **Go** (linguagem diferente -> interoperabilidade gRPC).
 - O cliente **não** alcança a rede `raft`; portanto não pode invocar `RequestVote`/`AppendEntries`.
 - Quórum **fixo = 3** (de 4), nunca reduzido por indisponibilidade.
 - Descoberta do líder **apenas** via `leader_hint` nas respostas (sem Name Server).
@@ -166,7 +166,7 @@ Se `rm -rf data/` falhar com “Permission denied”, a pasta foi criada como `r
 anterior (container sem `user:`). Corrija uma vez com `sudo chown -R "$(id -u):$(id -g)" data/`
 ou use o `.env` com `HOST_UID`/`HOST_GID` antes do próximo `docker compose up`.
 
-## Mapa de requisitos → implementação
+## Mapa de requisitos -> implementação
 
 | Requisito | Onde |
 |-----------|------|

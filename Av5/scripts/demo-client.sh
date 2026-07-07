@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Interactive scenario driver — runs queued client/ops steps; then free-form commands.
+# Interactive scenario driver - runs queued client/ops steps; then free-form commands.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -56,6 +56,29 @@ get_leader_committed_index() {
     fi
   done
   echo "$max"
+}
+
+# Descobre o ID do nó líder consultando cada nó (o cliente imprime "[lider]").
+find_leader_id() {
+  local n out
+  for n in 1 2 3 4; do
+    out=$(docker compose run --rm --no-deps client consume --node "node${n}:600${n}" 2>/dev/null) || continue
+    if echo "$out" | grep -qi '^\[lider\]'; then
+      echo "$n"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Escolhe uma réplica (não-líder) para o Cenário 4; prefere o maior ID disponível.
+pick_replica_id() {
+  local leader="$1" n
+  for n in 4 3 2 1; do
+    [[ "$n" == "$leader" ]] && continue
+    echo "$n"
+    return 0
+  done
 }
 
 publish_and_get_index() {
@@ -116,139 +139,192 @@ show_persist() {
 
 section() {
   echo
-  echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════${NC}"
+  echo -e "${BLUE}${BOLD}============================================================${NC}"
   echo -e "${BLUE}${BOLD}  $1${NC}"
-  echo -e "${BLUE}${BOLD}════════════════════════════════════════════════════════════${NC}"
+  echo -e "${BLUE}${BOLD}============================================================${NC}"
   echo
 }
 
 step_note() {
-  echo -e "${GREEN}• $1${NC}"
+  echo -e "${GREEN}- $1${NC}"
 }
 
-# --- Cenário 1 — Operação Normal ---
+# Rótulo explícito e bem destacado do subcenário sendo testado no fluxo do driver
+# (ex.: "1.1 - Inicialização dos 4 nós"). Aparece só nesta janela (do script de teste).
+sub() {
+  local text="  >> SUBCENÁRIO $1"
+  local line
+  line="$(printf '=%.0s' $(seq 1 60))"
+  echo
+  echo -e "${YELLOW}${BOLD}${line}${NC}"
+  echo -e "${YELLOW}${BOLD}${text}${NC}"
+  echo -e "${YELLOW}${BOLD}${line}${NC}"
+}
+
+# --- Cenário 1 - Operação Normal ---
 scenario_1() {
-  section "Cenário 1 — Operação Normal"
-  step_note "Nós já estão no ar. Observe a eleição na janela de logs (~10s)."
+  section "Cenário 1 - Operação Normal"
+
+  sub "1.1 - Inicialização dos quatro nós"
+  step_note "Os 4 nós já foram iniciados pelo run-scenarios.sh (docker compose up)."
+  step_note "Conferindo o status dos containers:"
+  pause_key
+  dc ps
+
+  sub "1.2 - Eleição automática de líder"
+  step_note "Observe na janela de logs quem é eleito LIDER (~10s)."
   pause_key "Pressione uma tecla quando o líder estiver visível nos logs... "
 
+  sub "1.3 - Publicação de dados pelo cliente"
   step_note "Publicar cidade=curitiba"
   pause_key
   run_client publish cidade curitiba
-
   step_note "Publicar estado=parana"
   pause_key
   run_client publish estado parana
 
+  sub "1.4 - Replicação das operações"
+  step_note "Cada publish acima só retornou OK após commit por quórum (3/4)."
+  step_note "Veja nos logs: 'OK replicado ate index=' (seguidores) e 'APLICADO (committed)'."
+  pause_key
+  dc logs --tail 30 node1 node2 node3 node4 2>/dev/null \
+    | grep -iE "replicado|APLICADO" | tail -n 12 || true
+
+  sub "1.5 - Consumo dos dados armazenados"
   step_note "Consumir todos os pares committed"
   pause_key
   run_client consume
-
   step_note "Consumir chave 'cidade'"
   pause_key
   run_client consume cidade
 }
 
-# --- Cenário 2 — Falha do Líder ---
+# --- Cenário 2 - Falha do Líder ---
 scenario_2() {
-  section "Cenário 2 — Falha do Líder"
+  section "Cenário 2 - Falha do Líder"
+
+  sub "2.1 - Interrupção do líder atual"
   step_note "Veja qual nó é o líder na janela de logs."
   local leader=""
   while [[ ! "$leader" =~ ^[1-4]$ ]]; do
     read -r -p "Digite o número do nó líder para parar (1-4): " leader
   done
-
   step_note "Parar node${leader}"
   pause_key
   dc stop "node${leader}"
 
+  sub "2.2 - Eleição de novo líder"
   step_note "Aguarde nova eleição nos logs (~10s)"
   pause_key "Pressione uma tecla quando o novo líder aparecer... "
 
+  sub "2.3 - Continuidade das operações de publicação e consumo"
   step_note "Publicar pais=brasil (cliente redireciona ao novo líder)"
   pause_key
   run_client publish pais brasil
-
   step_note "Consumir chave 'pais'"
   pause_key
   run_client consume pais
 
-  step_note "Reintegrar node${leader} (antigo líder) ao cluster"
+  # Reintegra o antigo líder ANTES de seguir: o quórum exige 3 de 4 nós.
+  step_note "Reintegrar node${leader} (antigo líder) - mantém quórum p/ próximos cenários"
   pause_key
   dc start "node${leader}"
   wait_for_replica_sync "$leader" 0 60 || true
 }
 
-# --- Cenário 3 — Persistência ---
+# --- Cenário 3 - Persistência (subpassos 4/5/6 do enunciado = 3.1/3.2/3.3) ---
 scenario_3() {
-  section "Cenário 3 — Persistência"
-  step_note "Parar node3"
+  section "Cenário 3 - Persistência"
+
+  sub "3.1 - Encerramento de um nó"
+  step_note "Estado persistido de node3 ANTES de parar (para comparar depois)"
+  pause_key
+  show_persist node3
+  step_note "Parar node3 (shutdown limpo grava termo/voto/log/commit em disco)"
   pause_key
   dc stop node3
 
+  sub "3.2 - Reinicialização do processo"
   step_note "Reiniciar node3"
   pause_key
   dc start node3
 
-  step_note "Logs recentes do node3"
+  sub "3.3 - Recuperação automática do estado persistido"
+  step_note "Logs recentes do node3 (recupera do disco e volta como Seguidor)"
   pause_key
   dc logs node3 2>/dev/null | tail -n 20 || true
-
-  step_note "Estado persistido em disco"
+  step_note "Estado persistido em disco após reinício (data/node3/node3.json)"
   pause_key
   show_persist node3
 }
 
-# --- Cenário 4 — Recuperação de Réplica ---
+# --- Cenário 4 - Recuperação de Réplica ---
 scenario_4() {
-  section "Cenário 4 — Recuperação de Réplica (sync incremental)"
-  step_note "Parar réplica node4 (idealmente um nó que NÃO seja o líder)"
-  pause_key
-  dc stop node4
+  section "Cenário 4 - Recuperação de Réplica (sync incremental)"
 
+  sub "4.1 - Interrupção de uma réplica"
+  step_note "Detectando o líder para escolher uma réplica (não o líder)..."
+  local leader rep
+  leader=$(find_leader_id || true)
+  rep=$(pick_replica_id "${leader:-0}")
+  step_note "Líder atual: node${leader:-?}; parar réplica node${rep}"
+  pause_key
+  dc stop "node${rep}"
+
+  sub "4.2 - Execução de novas operações (com a réplica fora)"
   local target_index=0 idx
-  step_note "Publicar a=1, b=2, c=3 enquanto node4 está fora"
+  step_note "Publicar a=1, b=2, c=3"
   pause_key
   idx=$(publish_and_get_index a 1) && [[ -n "$idx" ]] && target_index="$idx"
-
   pause_key
   idx=$(publish_and_get_index b 2) && [[ -n "$idx" ]] && target_index="$idx"
-
   pause_key
   idx=$(publish_and_get_index c 3) && [[ -n "$idx" ]] && target_index="$idx"
 
-  step_note "Reiniciar node4 — observe sync incremental nos logs"
+  sub "4.3 - Reinicialização da réplica"
+  step_note "Estado persistido de node${rep} ANTES de reintegrar (defasado do líder)"
   pause_key
-  dc start node4
+  show_persist "node${rep}"
+  step_note "Reiniciar node${rep}"
+  pause_key
+  dc start "node${rep}"
 
-  step_note "Aguardar node4 alcançar o índice do líder (poll automático)"
+  sub "4.4 - Sincronização automática apenas das entradas ausentes"
+  step_note "Nos logs de node${rep}: AppendEntries reenviam SÓ o trecho ausente (não a base toda)."
   pause_key
-  wait_for_replica_sync 4 "$target_index" 90 || true
-
-  step_note "Consumir via node4 (réplica recuperada)"
+  dc logs "node${rep}" 2>/dev/null | grep -iE "replicado|APLICADO" | tail -n 12 || true
+  step_note "Aguardar node${rep} alcançar o índice do líder (poll automático)"
   pause_key
-  run_client consume --node node4:6004
+  wait_for_replica_sync "$rep" "$target_index" 90 || true
+  step_note "Consumir via node${rep} (réplica recuperada)"
+  pause_key
+  run_client consume --node "node${rep}:600${rep}"
 }
 
-# --- Cenário 5 — Consistência de Leitura ---
+# --- Cenário 5 - Consistência de Leitura ---
 scenario_5() {
-  section "Cenário 5 — Consistência de Leitura"
-  step_note "Leitura em node1 (pode ser líder ou réplica)"
-  pause_key
-  run_client consume --node node1:6001
+  section "Cenário 5 - Consistência de Leitura"
 
-  step_note "Leitura em node2"
-  pause_key
-  run_client consume --node node2:6002
+  sub "5.1 - Leitura tanto no líder quanto nas réplicas"
+  step_note "Lendo os 4 nós - o cliente marca cada resposta como [lider] ou [replica]."
+  local n
+  for n in 1 2 3 4; do
+    step_note "Leitura em node${n}"
+    pause_key
+    run_client consume --node "node${n}:600${n}"
+  done
 
-  step_note "Leitura em node3"
+  sub "5.2 - Apenas dados efetivados (committed) são retornados"
+  step_note "Nas saídas acima, compare os campos por nó:"
+  step_note "  - 'items' lista SOMENTE entradas committed;"
+  step_note "  - 'committed_index' = até onde está efetivado;"
+  step_note "  - 'pending(uncommitted)' fica de FORA dos items (não é retornado ao cliente)."
   pause_key
-  run_client consume --node node3:6003
 }
 
 free_mode_help() {
   cat <<'EOF'
-Modo livre — comandos:
+Modo livre - comandos:
   publish <chave> <valor>
   consume [chave] [--node nodeX:600X]
   stop <nodeN>              ex: stop node2
@@ -308,7 +384,7 @@ run_free_command() {
 }
 
 free_mode() {
-  section "Modo livre — comandos customizados"
+  section "Modo livre - comandos customizados"
   free_mode_help
   echo -e "${GREEN}Cenários 1–5 concluídos. Digite comandos abaixo (help para ajuda, quit para sair).${NC}"
   echo
@@ -327,12 +403,12 @@ run_scenario() {
   local name="$1"
   shift
   if ! "$@"; then
-    echo -e "${YELLOW}AVISO: ${name} terminou com erros — continuando...${NC}" >&2
+    echo -e "${YELLOW}AVISO: ${name} terminou com erros - continuando...${NC}" >&2
   fi
 }
 
 main() {
-  echo -e "${BOLD}Av5 — demonstração interativa (cliente)${NC}"
+  echo -e "${BOLD}Av5 - demonstração interativa (cliente)${NC}"
   echo "Diretório: $ROOT"
   echo "Use a outra janela para acompanhar os logs dos nós."
   echo

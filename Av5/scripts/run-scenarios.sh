@@ -20,7 +20,7 @@ Antes de subir os nós, pergunta se deseja limpar data/ (persistência de execu�
 anteriores). Em stdin não interativo, mantém data/ sem perguntar.
 
 Abre duas janelas de terminal logo após subir os nós:
-  1) logs dos 4 nós (docker compose logs -f) — acompanhe a eleição aqui
+  1) logs dos 4 nós (docker compose logs -f) - acompanhe a eleição aqui
   2) driver interativo dos cenários 1–5 + modo livre
 
 O Cenário 1 já pede para pressionar tecla quando o líder aparecer nos logs.
@@ -66,7 +66,7 @@ prepare_data_dirs() {
 
 maybe_clear_data() {
   if [[ ! -t 0 ]]; then
-    echo "==> stdin não interativo — mantendo data/ existente"
+    echo "==> stdin não interativo - mantendo data/ existente"
     prepare_data_dirs
     return
   fi
@@ -110,21 +110,21 @@ if [[ "$STARTUP_DELAY" -gt 0 ]]; then
   sleep "$STARTUP_DELAY"
 fi
 
-LOGS_CMD="cd $(printf '%q' "$ROOT") && echo '=== Av5 — logs dos nós (Ctrl+C para parar o follow) ===' && docker compose logs -f node1 node2 node3 node4; echo; echo '--- logs encerrados (digite exit para fechar) ---'; exec bash"
+LOGS_CMD="cd $(printf '%q' "$ROOT") && echo '=== Av5 - logs dos nós (Ctrl+C para parar o follow) ===' && docker compose logs -f node1 node2 node3 node4; echo; echo '--- logs encerrados (digite exit para fechar) ---'; exec bash"
 CLIENT_CMD="cd $(printf '%q' "$ROOT") && $(printf '%q' "$ROOT/scripts/demo-client.sh"); echo; echo '--- driver encerrado (digite exit para fechar a janela) ---'; exec bash"
 
 echo "==> Abrindo janela de logs..."
-open_terminal "Av5 — Logs" "$LOGS_CMD"
+open_terminal "Av5 - Logs" "$LOGS_CMD"
 
 sleep 1
 
 echo "==> Abrindo janela do cliente interativo..."
-open_terminal "Av5 — Cliente" "$CLIENT_CMD"
+open_terminal "Av5 - Cliente" "$CLIENT_CMD"
 
 echo
 echo "Demonstração iniciada."
-echo "  • Janela 'Av5 — Logs'    : acompanhe eleição, replicação e recuperação"
-echo "  • Janela 'Av5 — Cliente' : pressione tecla entre cada passo dos cenários"
+echo "  - Janela 'Av5 - Logs'    : acompanhe eleição, replicação e recuperação"
+echo "  - Janela 'Av5 - Cliente' : pressione tecla entre cada passo dos cenários"
 echo
 echo "Para encerrar o cluster depois:"
 echo "  cd $ROOT && docker compose down"
