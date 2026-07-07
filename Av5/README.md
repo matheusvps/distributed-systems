@@ -47,7 +47,7 @@ pip install -r server/requirements-dev.txt
 ```
 
 `scripts/run-tests.sh` define `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` para ignorar plugins
-de terceiros no ambiente (ex.: ROS `launch_testing`).
+de terceiros no ambiente.
 
 ## Demonstração interativa (cenários 1–5)
 
