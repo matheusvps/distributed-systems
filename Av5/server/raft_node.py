@@ -422,5 +422,13 @@ class RaftNode:
             time.sleep(config.TICK_INTERVAL)
             try:
                 self.tick()
-            except Exception as exc:  # never let the ticker die
+            except Exception as exc:
                 self.log_event(f"erro no ticker: {exc}")
+
+    def stop(self):
+        self.running = False
+        self._workers.shutdown(wait=False)
+        self._replicate_pool.shutdown(wait=False)
+        with self.lock:
+            self._persist()
+        self.log_event("encerrando (estado persistido)")

@@ -1,3 +1,4 @@
+import signal
 import threading
 from concurrent import futures
 
@@ -72,5 +73,17 @@ def serve(node_id):
     node.log_event(f"RaftService interno em {config.RAFT_NODE_ADDRESSES[node_id]}")
     node.log_event(f"ClientService em {config.CLIENT_NODE_ADDRESSES[node_id]}")
 
-    threading.Thread(target=raft_server.wait_for_termination, daemon=True).start()
-    client_server.wait_for_termination()
+    shutdown = threading.Event()
+
+    def _handle_signal(signum, _frame):
+        node.log_event(f"sinal {signal.Signals(signum).name} recebido; shutdown limpo")
+        shutdown.set()
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
+    shutdown.wait()
+
+    node.stop()
+    raft_server.stop(grace=1.0)
+    client_server.stop(grace=1.0)

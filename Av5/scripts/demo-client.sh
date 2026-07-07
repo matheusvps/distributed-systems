@@ -172,6 +172,11 @@ scenario_2() {
   step_note "Consumir chave 'pais'"
   pause_key
   run_client consume pais
+
+  step_note "Reintegrar node${leader} (antigo líder) ao cluster"
+  pause_key
+  dc start "node${leader}"
+  wait_for_replica_sync "$leader" 0 60 || true
 }
 
 # --- Cenário 3 — Persistência ---
