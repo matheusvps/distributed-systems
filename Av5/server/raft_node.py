@@ -1,4 +1,5 @@
 import concurrent.futures
+import os
 import random
 import threading
 import time
@@ -422,6 +423,14 @@ class RaftNode:
             time.sleep(config.TICK_INTERVAL)
             try:
                 self.tick()
+            except OSError as exc:
+                # Falha ao persistir estado (disco/permissao) e fatal: sem
+                # persistir voto/term o no violaria a seguranca do Raft. Em vez
+                # de girar num livelock de eleicao (term subindo pra sempre),
+                # encerra ruidosamente e deixa o restart policy/operador agir.
+                self.running = False
+                self.log_event(f"FALHA FATAL de persistencia: {exc}; encerrando")
+                os._exit(1)
             except Exception as exc:
                 self.log_event(f"erro no ticker: {exc}")
 
